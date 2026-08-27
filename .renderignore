@@ -1,0 +1,6 @@
+# Ignore mobile app
+mobile/
+.git/
+README.md
+eas.json
+node_modules/

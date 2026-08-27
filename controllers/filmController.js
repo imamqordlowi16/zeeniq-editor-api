@@ -31,67 +31,6 @@ function generateJobId() {
   return 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-// ─── AI Idea Generator ────────────────────────────────────────────────────────
-
-const GENRE_PROMPTS = {
-  'Parodi Gaming': 'Create a hilarious parody short film about gaming culture — lag, toxic teammates, epic fails, and the ultimate boss battle against reality.',
-  'Meme Sekolah': 'Create a comedic short film about school life — exams, cafeteria drama, teacher quirks, and the relentless struggle of homework.',
-  'Horor Komedi': 'Create a dark comedy horror short film — spooky encounters turned awkward, ghosts with bad manners, and terrifying yet funny situations.',
-  'Kehidupan Kantoran': 'Create a satirical short film about office life — Monday meetings, printer jams, coffee addiction, and the quest for the perfect lunch break.',
-  'Random': 'Create an unexpected, creative short film concept that combines two unrelated genres in a surprising and entertaining way.',
-};
-
-async function generateIdea(req, res) {
-  const { genre } = req.body;
-  if (!genre) return res.status(400).json({ success: false, error: "Genre is required" });
-  const prompt = `You are a creative short film director. Generate a unique short film concept based on this genre: "${genre}".
-
-Return a JSON object with these exact fields:
-{
-  "title": "catchy 3-5 word title",
-  "logline": "one sentence pitch",
-  "characters": ["character 1 description", "character 2 description"],
-  "scenes": [
-    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10},
-    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10},
-    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10}
-  ],
-  "suggestedVisualStyle": "Cyberpunk 3D|Anime|Realistic|Cartoon|Noir",
-  "suggestedVoiceStyle": "Narrator Male|Soft Female|Dramatic Voice"
-}
-
-Return ONLY valid JSON, no markdown formatting.`;
-
-  let openai, genai;
-  try {
-    openai = getOpenAIClient(req);
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.9,
-      max_tokens: 1500,
-    });
-    if (!response || !response.choices || !response.choices[0]) { console.error("OpenAI error:", response); throw new Error("Invalid OpenAI response"); }
-    const content = response.choices[0].message.content.trim();
-    return res.json({ success: true, idea: JSON.parse(content) });
-  } catch (e) {
-    // Fallback to Gemini
-    try {
-      genai = getGenAIClient(req);
-      const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      const result = await model.generateContent(prompt);
-      if (!result || !result.response) { console.error("Gemini error:", result); throw new Error("Invalid Gemini response"); }
-      const text = result.response.text().trim();
-      // Extract JSON from可能的 markdown
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
-      return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
-    } catch (e2) {
-      throw new Error('Both OpenAI and Gemini failed. Check API keys.');
-    }
-  }
-}
-
 // ─── Film Generation Pipeline ─────────────────────────────────────────────────
 
 async function step1_generate_script(options, req) {
@@ -243,13 +182,57 @@ async function executeJob(jobId, options, req) {
 // ─── Route Handlers ───────────────────────────────────────────────────────────
 
 async function generateIdea(req, res) {
+  console.log('[DEBUG] generateIdea called, res type:', typeof res, 'res keys:', res ? Object.keys(res) : 'N/A');
   try {
     const { genre } = req.body;
     if (!genre) {
       return res.status(400).json({ success: false, error: 'Genre is required' });
     }
-    const idea = await generateIdea(genre);
-    return res.json({ success: true, idea });
+
+    const prompt = `You are a creative short film director. Generate a unique short film concept based on this genre: "${genre}".
+
+Return a JSON object with these exact fields:
+{
+  "title": "catchy 3-5 word title",
+  "logline": "one sentence pitch",
+  "characters": ["character 1 description", "character 2 description"],
+  "scenes": [
+    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10},
+    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10},
+    {"visual_prompt": "detailed scene visual description", "narration": "voiceover text", "duration_seconds": 10}
+  ],
+  "suggestedVisualStyle": "Cyberpunk 3D|Anime|Realistic|Cartoon|Noir",
+  "suggestedVoiceStyle": "Narrator Male|Soft Female|Dramatic Voice"
+}
+
+Return ONLY valid JSON, no markdown formatting.`;
+
+    let openai, genai;
+    try {
+      openai = getOpenAIClient(req);
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.9,
+        max_tokens: 1500,
+      });
+      if (!response?.choices?.[0]) throw new Error('Invalid OpenAI response');
+      const content = response.choices[0].message.content.trim();
+      return res.json({ success: true, idea: JSON.parse(content) });
+    } catch (e) {
+      try {
+        genai = getGenAIClient(req);
+        const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        if (!result?.response) throw new Error('Invalid Gemini response');
+        const text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
+        return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
+      } catch (e2) {
+        throw new Error('Both OpenAI and Gemini failed. Check API keys.');
+      }
+    }
   } catch (error) {
     console.error('Generate idea error:', error);
     return res.status(500).json({ success: false, error: error.message });
