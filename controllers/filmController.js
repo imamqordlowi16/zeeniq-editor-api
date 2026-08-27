@@ -41,7 +41,9 @@ const GENRE_PROMPTS = {
   'Random': 'Create an unexpected, creative short film concept that combines two unrelated genres in a surprising and entertaining way.',
 };
 
-async function generateIdea(genre) {
+async function generateIdea(req, res) {
+  const { genre } = req.body;
+  if (!genre) return res.status(400).json({ success: false, error: "Genre is required" });
   const prompt = `You are a creative short film director. Generate a unique short film concept based on this genre: "${genre}".
 
 Return a JSON object with these exact fields:
@@ -70,7 +72,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       max_tokens: 1500,
     });
     const content = response.choices[0].message.content.trim();
-    return JSON.parse(content);
+    return res.json({ success: true, idea: JSON.parse(content) });
   } catch (e) {
     // Fallback to Gemini
     try {
@@ -80,8 +82,8 @@ Return ONLY valid JSON, no markdown formatting.`;
       const text = result.response.text().trim();
       // Extract JSON from可能的 markdown
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return { title: text.substring(0, 50), logline: text, scenes: [] };
+      if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
+      return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
     } catch (e2) {
       throw new Error('Both OpenAI and Gemini failed. Check API keys.');
     }
@@ -117,7 +119,7 @@ Return valid JSON array only, no markdown formatting.`;
       max_tokens: 2000,
     });
     const content = response.choices[0].message.content.trim();
-    return JSON.parse(content);
+    return { success: true, idea: JSON.parse(content) };
   } catch (e) {
     // Fallback to Gemini
     const genaiClient = getGenAIClient(req);
