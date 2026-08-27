@@ -64,21 +64,23 @@ Return ONLY valid JSON, no markdown formatting.`;
 
   let openai, genai;
   try {
-    openai = getOpenAIClient({ headers: {} });
+    openai = getOpenAIClient(req);
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.9,
       max_tokens: 1500,
     });
+    if (!response || !response.choices || !response.choices[0]) { console.error("OpenAI error:", response); throw new Error("Invalid OpenAI response"); }
     const content = response.choices[0].message.content.trim();
     return res.json({ success: true, idea: JSON.parse(content) });
   } catch (e) {
     // Fallback to Gemini
     try {
-      genai = getGenAIClient({ headers: {} });
+      genai = getGenAIClient(req);
       const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const result = await model.generateContent(prompt);
+      if (!result || !result.response) { console.error("Gemini error:", result); throw new Error("Invalid Gemini response"); }
       const text = result.response.text().trim();
       // Extract JSON from可能的 markdown
       const jsonMatch = text.match(/\{[\s\S]*\}/);
