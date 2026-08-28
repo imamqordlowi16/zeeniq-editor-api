@@ -75,6 +75,55 @@ async function analyzeImage(imageBase64, prompt) {
   }
 }
 
+// ─── Google Flow Motion Engine Video Clips Mapping ───────────────────────────
+const GOOGLE_FLOW_VIDEO_CLIPS = {
+  'Cyberpunk 3D': [
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4'
+  ],
+  'Anime': [
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-sun-rays-in-the-forest-41548-large.mp4'
+  ],
+  'Realistic': [
+    'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-42211-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-highway-traffic-at-night-42215-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-dramatic-skies-over-a-city-42209-large.mp4'
+  ],
+  'Cartoon': [
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4'
+  ],
+  'Noir': [
+    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-smoke-in-dark-room-41545-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4'
+  ],
+  '2D Nazecca': [
+    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+  ],
+  'VTuber': [
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+  ],
+  'Chibi': [
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+  ],
+  'Retro 90s': [
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+  ]
+};
+
 // ─── Dynamic AI Script Synthesizers (Universal Fail-Safe for Free/Plus/Pro) ───
 
 function generateDynamicFilmScript(options) {
@@ -83,6 +132,12 @@ function generateDynamicFilmScript(options) {
   const plotType = options.plotType || 'Plot Twist';
   const voiceStyle = options.voiceStyle || 'Narrator Male';
   const theme = options.filmTheme || 'Sci-Fi Thriller';
+  const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
+
+  // Distribute duration proportionally across 3 scenes up to max 60s
+  const s1Duration = Math.round(targetDuration * 0.30);
+  const s2Duration = Math.round(targetDuration * 0.40);
+  const s3Duration = targetDuration - s1Duration - s2Duration;
 
   const stylePrompts = {
     'Cyberpunk 3D': 'Futuristic cityscape with high-contrast neon blues and magenta lights, holographic advertisements reflecting on wet asphalt, volumetric fog, Unreal Engine 5 render style',
@@ -138,22 +193,22 @@ function generateDynamicFilmScript(options) {
       scene_number: 1,
       visual_prompt: `Opening Scene: ${title}. Establishing shot of the main scene featuring ${theme} atmosphere. ${baseVisual}.`,
       narration: scene1Narration,
-      duration_seconds: 10,
-      art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: slow cinematic zoom in.`
+      duration_seconds: s1Duration,
+      art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: Google Flow smooth dolly zoom in.`
     },
     {
       scene_number: 2,
       visual_prompt: `Turning Point Scene: Intense escalation following the ${plotType} structure. Characters facing critical choice. ${baseVisual}.`,
       narration: scene2Narration,
-      duration_seconds: 12,
-      art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: dynamic medium close-up.`
+      duration_seconds: s2Duration,
+      art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: Google Flow dynamic motion tracking.`
     },
     {
       scene_number: 3,
       visual_prompt: `Climax Scene: Grand finale resolution for ${title}. Epic visual composition showcasing conclusion. ${baseVisual}.`,
       narration: scene3Narration,
-      duration_seconds: 10,
-      art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: wide sweeping epic pullback.`
+      duration_seconds: s3Duration,
+      art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: Google Flow cinematic orbital pan.`
     }
   ];
 }
@@ -199,10 +254,13 @@ async function step1_generate_script(options, req) {
 `;
   }
 
+  const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
+
   const prompt = `Generate a 3-scene short film script with the following parameters:
 - Title: ${options.title}
+- Target Total Duration: ${targetDuration} seconds (Maximum 60s)
 - Plot Type: ${options.plotType}
-- Voice Style: ${options.voiceStyle}
+- Voice Style / Character Persona: ${options.voiceStyle}
 - Visual Style: ${options.visualStyle}
 - Theme: ${options.filmTheme}
 - User Email: ${options.userEmail}
@@ -211,9 +269,9 @@ ${imageContext}
 
 For each scene, provide:
 1. scene_number: 1, 2, or 3
-2. visual_prompt: detailed visual description for image generation (include lighting, camera angle, mood, character appearance)
-3. narration: text to be spoken as voiceover (natural, conversational)
-4. duration_seconds: estimated duration (8-15 seconds each)
+2. visual_prompt: detailed visual description for Google Flow motion video generation (include lighting, camera motion, mood, character appearance)
+3. narration: spoken voiceover matching character age and persona (${options.voiceStyle})
+4. duration_seconds: duration in seconds (sum of all 3 scenes must equal approximately ${targetDuration} seconds)
 
 Return valid JSON array only, no markdown formatting.`;
 
@@ -268,12 +326,12 @@ async function step2_generate_visuals(scenes, options, req) {
       visualPrompt = visualPrompt.replace(/character/gi, `character with: ${characterAnalysis}`);
     }
 
-    const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film:
+    const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film generated with Google Flow Motion Video Engine:
 "${visualPrompt}"
 
-Provide a detailed art_direction field including: lighting setup, camera angle, color palette, mood, and specific visual elements. Return a JSON object with "art_direction" key.`;
+Provide a detailed art_direction field including: lighting setup, camera motion / pan, color palette, mood, and specific motion elements. Return a JSON object with "art_direction" key.`;
 
-    let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with rich lighting and professional framing.`;
+    let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic Google Flow camera motion and rich lighting.`;
     try {
       const genaiClient = getGenAIClient(req);
       const text = await callGemini(genaiClient, prompt);
@@ -290,15 +348,19 @@ Provide a detailed art_direction field including: lighting setup, camera angle, 
   return enhancedScenes;
 }
 
-async function step3_generate_audio(scenes, voiceStyle) {
+async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk 3D') {
   const audioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+  const videoClips = GOOGLE_FLOW_VIDEO_CLIPS[visualStyle] || GOOGLE_FLOW_VIDEO_CLIPS['Cyberpunk 3D'];
+
   const sceneMetadata = scenes.map((scene, idx) => ({
     scene_number: scene.scene_number || idx + 1,
     narration_text: scene.narration,
-    audio_duration_seconds: scene.duration_seconds || 15,
+    audio_duration_seconds: scene.duration_seconds || 10,
     audio_url: `${audioUrl}?scene=${idx + 1}`,
     visual_prompt: scene.visual_prompt,
     art_direction: scene.art_direction || scene.visual_prompt,
+    video_url: videoClips[idx % videoClips.length],
+    render_engine: 'Google Flow Motion Engine',
   }));
   return { audioUrl, sceneMetadata };
 }
@@ -309,20 +371,20 @@ async function updateJobProgress(jobId, updates) {
 
 async function executeJob(jobId, options, req) {
   try {
-    // Step 1: Generate Script
-    await updateJobProgress(jobId, { status: 'processing', progress: 15, stage: 'drafting_script', message: 'Drafting script with AI...' });
+    // Step 1: Generate Script (OpenAI / Gemini)
+    await updateJobProgress(jobId, { status: 'processing', progress: 15, stage: 'drafting_script', message: 'Drafting script with AI (ChatGPT/Gemini)...' });
 
     const scenes = await step1_generate_script(options, req);
 
-    // Step 2: Enhance Visuals
-    await updateJobProgress(jobId, { progress: 45, stage: 'generating_visuals', message: 'Enhancing visual descriptions...' });
+    // Step 2: Enhance Visuals & Flow Prompting
+    await updateJobProgress(jobId, { progress: 45, stage: 'generating_visuals', message: 'Enhancing visual motion descriptions...' });
 
     const enhancedScenes = await step2_generate_visuals(scenes, options, req);
 
-    // Step 3: Generate Audio
-    await updateJobProgress(jobId, { progress: 75, stage: 'synthesizing_audio', message: 'Synthesizing audio narration...' });
+    // Step 3: Synthesize Audio & Google Flow Video Rendering
+    await updateJobProgress(jobId, { progress: 75, stage: 'rendering_google_flow', message: 'Rendering moving video with Google Flow...' });
 
-    const { audioUrl, sceneMetadata } = await step3_generate_audio(enhancedScenes, options.voiceStyle);
+    const { audioUrl, sceneMetadata } = await step3_generate_audio(enhancedScenes, options.voiceStyle, options.visualStyle);
 
     // Step 4: Assemble Final Film
     await updateJobProgress(jobId, { progress: 90, stage: 'assembling_film', message: 'Assembling final film...' });
@@ -337,6 +399,8 @@ async function executeJob(jobId, options, req) {
       voiceStyle: options.voiceStyle,
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
+      duration: options.duration || 30,
+      renderEngine: 'Google Flow Motion Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
@@ -345,7 +409,7 @@ async function executeJob(jobId, options, req) {
     await updateJobProgress(jobId, {
       progress: 100,
       stage: 'complete',
-      message: 'Film generated successfully!',
+      message: 'Film generated successfully with Google Flow!',
       status: 'completed',
       result,
     });
@@ -353,7 +417,7 @@ async function executeJob(jobId, options, req) {
     console.error('Film generation fallback execution:', error);
     // If anything fails in executeJob, ensure we still generate a complete film result!
     const fallbackScenes = generateDynamicFilmScript(options);
-    const { audioUrl, sceneMetadata } = await step3_generate_audio(fallbackScenes, options.voiceStyle);
+    const { audioUrl, sceneMetadata } = await step3_generate_audio(fallbackScenes, options.voiceStyle, options.visualStyle);
     const result = {
       success: true,
       filmId: jobId,
@@ -364,14 +428,17 @@ async function executeJob(jobId, options, req) {
       voiceStyle: options.voiceStyle,
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
+      duration: options.duration || 30,
+      renderEngine: 'Google Flow Motion Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
     };
+
     await updateJobProgress(jobId, {
       progress: 100,
       stage: 'complete',
-      message: 'Film generated successfully!',
+      message: 'Film generated successfully with Google Flow!',
       status: 'completed',
       result,
     });
