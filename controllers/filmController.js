@@ -28,25 +28,48 @@ function generateJobId() {
   return 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// ─── Gemini Multi-Model Helper ───────────────────────────────────────────────
+
+const GEMINI_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+];
+
+async function callGemini(client, content) {
+  let lastError = null;
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const model = client.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' });
+      const result = await model.generateContent(content);
+      return result.response.text().trim();
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}. Trying next fallback...`);
+    }
+  }
+  throw new Error(`All Gemini models failed: ${lastError ? lastError.message : 'Unknown error'}`);
+}
+
 // ─── Image Analysis Helper ────────────────────────────────────────────────────
 
 async function analyzeImage(imageBase64, prompt) {
   try {
     const client = getGenAIClient({ headers: {} });
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
     const matches = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!matches) throw new Error('Invalid image format');
 
     const mimeType = matches[1];
     const data = matches[2];
 
-    const result = await model.generateContent([
+    const content = [
       prompt,
       { inlineData: { data, mimeType } },
-    ]);
+    ];
 
-    return result.response.text().trim();
+    return await callGemini(client, content);
   } catch (error) {
     console.error('Image analysis error:', error.message);
     return null;
@@ -56,8 +79,6 @@ async function analyzeImage(imageBase64, prompt) {
 // ─── Film Generation Pipeline ─────────────────────────────────────────────────
 
 async function step1_generate_script(options, req) {
-  const client = getOpenAIClient(req);
-
   let imageContext = '';
   if (options.characterImageBase64) {
     imageContext = `
@@ -84,6 +105,7 @@ For each scene, provide:
 Return valid JSON array only, no markdown formatting.`;
 
   try {
+    const client = getOpenAIClient(req);
     const response = await client.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
@@ -91,21 +113,21 @@ Return valid JSON array only, no markdown formatting.`;
       max_tokens: 2000,
     });
     const content = response.choices[0].message.content.trim();
-    return { success: true, idea: JSON.parse(content) };
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    return JSON.parse(content);
   } catch (e) {
+    console.log('[Step 1] OpenAI failed, falling back to Gemini:', e.message);
     const genaiClient = getGenAIClient(req);
-    const model = genaiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGemini(genaiClient, prompt);
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    throw new Error('Failed to generate script from both APIs');
+    throw new Error('Failed to parse script from Gemini response');
   }
 }
 
 async function step2_generate_visuals(scenes, options, req) {
-  const client = getGenAIClient(req);
-  const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const genaiClient = getGenAIClient(req);
   const enhancedScenes = [];
 
   let characterAnalysis = null;
@@ -128,8 +150,7 @@ async function step2_generate_visuals(scenes, options, req) {
 Provide a detailed art_direction field including: lighting setup, camera angle, color palette, mood, and specific visual elements. Return a JSON object with "art_direction" key.`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
+      const text = await callGemini(genaiClient, prompt);
       let artDirection = text;
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -265,6 +286,7 @@ Return a JSON array with 3 scenes:
 The tone should be enthusiastic and persuasive, suitable for ${options.targetPlatform}. Use Indonesian language if appropriate for the platform. Return ONLY valid JSON.`;
 
   try {
+    const client = getOpenAIClient(req);
     const response = await client.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
@@ -272,12 +294,13 @@ The tone should be enthusiastic and persuasive, suitable for ${options.targetPla
       max_tokens: 1500,
     });
     const content = response.choices[0].message.content.trim();
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
     return JSON.parse(content);
   } catch (e) {
+    console.log('[Affiliate Step 1] OpenAI failed, falling back to Gemini:', e.message);
     const genaiClient = getGenAIClient(req);
-    const model = genaiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGemini(genaiClient, prompt);
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
     throw new Error('Failed to generate affiliate script');
@@ -285,8 +308,7 @@ The tone should be enthusiastic and persuasive, suitable for ${options.targetPla
 }
 
 async function affiliateStep2_generate_visuals(scenes, options, req) {
-  const client = getGenAIClient(req);
-  const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const genaiClient = getGenAIClient(req);
   const enhancedScenes = [];
 
   let productAnalysis = null;
@@ -309,8 +331,7 @@ async function affiliateStep2_generate_visuals(scenes, options, req) {
 Make it eye-catching, professional, and suitable for ${options.targetPlatform}. Include dynamic lighting and clear product visibility.`;
 
     try {
-      const result = await model.generateContent(enhancedPrompt);
-      const enhancedText = result.response.text().trim();
+      const enhancedText = await callGemini(genaiClient, enhancedPrompt);
       enhancedScenes.push({ ...scene, enhanced_visual_prompt: enhancedText });
     } catch (e) {
       enhancedScenes.push({ ...scene });
@@ -414,9 +435,8 @@ Return a JSON object with these exact fields:
 
 Return ONLY valid JSON, no markdown formatting.`;
 
-    let openai, genai;
     try {
-      openai = getOpenAIClient(req);
+      const openai = getOpenAIClient(req);
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -425,19 +445,19 @@ Return ONLY valid JSON, no markdown formatting.`;
       });
       if (!response?.choices?.[0]) throw new Error('Invalid OpenAI response');
       const content = response.choices[0].message.content.trim();
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
       return res.json({ success: true, idea: JSON.parse(content) });
     } catch (e) {
+      console.log('[generateIdea] OpenAI failed, falling back to Gemini:', e.message);
       try {
-        genai = getGenAIClient(req);
-        const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent(prompt);
-        if (!result?.response) throw new Error('Invalid Gemini response');
-        const text = result.response.text().trim();
+        const genai = getGenAIClient(req);
+        const text = await callGemini(genai, prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
         return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
       } catch (e2) {
-        throw new Error('Both OpenAI and Gemini failed. Check API keys.');
+        throw new Error('Both OpenAI and Gemini failed: ' + e2.message);
       }
     }
   } catch (error) {
