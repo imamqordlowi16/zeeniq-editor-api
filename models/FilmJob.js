@@ -33,7 +33,6 @@ const filmJobSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Index for quick lookups
-filmJobSchema.index({ jobId: 1 });
 filmJobSchema.index({ userId: 1, createdAt: -1 });
 filmJobSchema.index({ userEmail: 1 });
 

@@ -477,8 +477,9 @@ async function generateFilm(req, res) {
       createdAt: new Date(),
     });
 
-    // Start async execution
-    executeJob(jobId, { ...req.body, isPremium: isPremiumUser }, req);
+    // Start async execution (non-blocking fire-and-forget)
+    executeJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
+      .catch(err => console.error(`[Job ${jobId}] Unhandled error:`, err));
 
     return res.json({ jobId, status: 'processing', isPremiumUser });
   } catch (error) {
@@ -536,7 +537,9 @@ async function generateAffiliateVideo(req, res) {
       createdAt: new Date(),
     });
 
-    executeAffiliateJob(jobId, { ...req.body, isPremium: isPremiumUser }, req);
+    // Start async execution (non-blocking fire-and-forget)
+    executeAffiliateJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
+      .catch(err => console.error(`[Affiliate Job ${jobId}] Unhandled error:`, err));
 
     return res.json({ jobId, status: 'processing' });
   } catch (error) {
