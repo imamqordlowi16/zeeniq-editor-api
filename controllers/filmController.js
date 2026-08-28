@@ -98,25 +98,60 @@ function generateDynamicFilmScript(options) {
 
   const baseVisual = stylePrompts[visualStyle] || stylePrompts['Cyberpunk 3D'];
 
+  // Tailor narration tone & vocabulary by character age / voice persona
+  let scene1Narration = `Di balik gemerlap dunia ${theme}, sebuah kisah bermula dari rahasia yang tak terduga. ${title}.`;
+  let scene2Narration = `Ketika kenyataan mulai terungkap, setiap langkah kini menjadi pertaruhan antara takdir dan pilihan.`;
+  let scene3Narration = `Pada akhirnya, semua teka-teki menemukan jalannya. Inilah akhir dari perjalanan yang sesungguhnya.`;
+
+  if (voiceStyle.includes('Anak')) {
+    scene1Narration = `Wah, kalian tahu gak? Cerita seru tentang ${title} ini dimulai dari sebuah rahasia ajaib di dunia ${theme}!`;
+    scene2Narration = `Tiba-tiba suasananya jadi menegangkan banget! Kita harus berani menghadapi rintangan ini bersama-sama!`;
+    scene3Narration = `Hore! Akhirnya semua teka-teki terpecahkan dengan seru! Petualangan yang luar biasa!`;
+  } else if (voiceStyle.includes('Remaja')) {
+    scene1Narration = `Gokil sih, awalnya gak ada yang nyangka kalau petualangan tentang ${title} ini bakal sekeren ini di dunia ${theme}.`;
+    scene2Narration = `Pas masuk momen krusial, fix ini saatnya ambil keputusan berani dan pantang menyerah!`;
+    scene3Narration = `Gila beneran, endingnya epic abis! Semua perjuangan akhirnya terbayar lunas.`;
+  } else if (voiceStyle.includes('Wanita Muda')) {
+    scene1Narration = `Terkadang, langkah terbesar dimulai dari sebuah tekad sederhana. Inilah kisah tentang ${title} di tengah nuansa ${theme}.`;
+    scene2Narration = `Di saat keraguan datang, keyakinan dan intuisi menjadi penunjuk arah yang paling berharga.`;
+    scene3Narration = `Sebuah akhir yang indah membuktikan bahwa setiap proses adalah pembelajaran yang bermakna.`;
+  } else if (voiceStyle.includes('Kakek') || voiceStyle.includes('Elder')) {
+    scene1Narration = `Dari zaman dahulu, alam selalu mengajarkan bahwa kisah ${title} ini menyimpan pesan berharga di semesta ${theme}.`;
+    scene2Narration = `Waktu yang menguji kesabaran jiwa. Di persimpangan inilah kebijaksanaan menentukan segalanya.`;
+    scene3Narration = `Dan seperti aliran sungai yang bermuara ke lautan, kebenaran sejati akan selalu abadi.`;
+  } else if (voiceStyle.includes('Nenek')) {
+    scene1Narration = `Dengarkan cerita ini baik-baik ya, tentang ${title} yang penuh ketulusan di dunia ${theme}.`;
+    scene2Narration = `Meski jalannya berliku, jangan pernah takut, karena kasih sayang dan kebaikan selalu menuntun kita.`;
+    scene3Narration = `Lihatlah, senyuman hangat menutup kisah ini dengan penuh kebahagiaan untuk kita semua.`;
+  } else if (voiceStyle.includes('Cyber') || voiceStyle.includes('Robot')) {
+    scene1Narration = `Memulai inisialisasi modul naratif: ${title}. Protokol ${theme} terdeteksi aktif pada sektor utama.`;
+    scene2Narration = `Peringatan: Kalkulasi anomali terdeteksi meningkat tajam. Mengeksekusi penyesuaian algoritma kritis.`;
+    scene3Narration = `Proses kalkulasi selesai dengan sukses. Stabilitas sistem dan resolusi cerita tercapai seratus persen.`;
+  } else if (voiceStyle.includes('Suara Sendiri')) {
+    scene1Narration = `Halo semuanya, ini adalah project film karya saya: ${title}, yang berlatar di dunia ${theme}.`;
+    scene2Narration = `Di titik inilah konflik utama semakin memuncak dan jalan ceritanya semakin seru.`;
+    scene3Narration = `Terima kasih sudah menyaksikan kisah ini sampai selesai, semoga kalian terhibur!`;
+  }
+
   return [
     {
       scene_number: 1,
       visual_prompt: `Opening Scene: ${title}. Establishing shot of the main scene featuring ${theme} atmosphere. ${baseVisual}.`,
-      narration: `Di balik gemerlap dunia ${theme}, sebuah kisah bermula dari rahasia yang tak terduga. ${title}.`,
+      narration: scene1Narration,
       duration_seconds: 10,
       art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: slow cinematic zoom in.`
     },
     {
       scene_number: 2,
       visual_prompt: `Turning Point Scene: Intense escalation following the ${plotType} structure. Characters facing critical choice. ${baseVisual}.`,
-      narration: `Ketika kenyataan mulai terungkap, setiap langkah kini menjadi pertaruhan antara takdir dan pilihan.`,
+      narration: scene2Narration,
       duration_seconds: 12,
       art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: dynamic medium close-up.`
     },
     {
       scene_number: 3,
       visual_prompt: `Climax Scene: Grand finale resolution for ${title}. Epic visual composition showcasing conclusion. ${baseVisual}.`,
-      narration: `Pada akhirnya, semua teka-teki menemukan jalannya. Inilah akhir dari perjalanan yang sesungguhnya.`,
+      narration: scene3Narration,
       duration_seconds: 10,
       art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: wide sweeping epic pullback.`
     }
