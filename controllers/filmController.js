@@ -31,18 +31,17 @@ function generateJobId() {
 // ─── Gemini Multi-Model Helper ───────────────────────────────────────────────
 
 const GEMINI_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.7-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-flash-latest',
-  'gemini-pro-latest',
+  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-pro',
+  'gemini-1.5-flash-8b',
 ];
 
 async function callGemini(client, content) {
   let lastError = null;
   for (const modelName of GEMINI_MODELS) {
     try {
-      const model = client.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' });
+      const model = client.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(content);
       return result.response.text().trim();
     } catch (err) {
@@ -410,9 +409,100 @@ function detectUserTier(req) {
 
 // ─── Route Handlers ───────────────────────────────────────────────────────────
 
+const FALLBACK_IDEAS = {
+  'Parodi Gaming': [
+    {
+      title: 'Misteri Lag di Babak Final',
+      logline: 'Seorang pro player tiba-tiba mengalami ping 999ms tepat saat turnamen tingkat dunia, membongkar konspirasi router tetangga.',
+      characters: ['Budi (Gamer Ambisius)', 'Pak RT (Pemilik WiFi Sakti)'],
+      scenes: [
+        { visual_prompt: 'Cinematic close-up of intense gamer face illuminated by RGB neon lighting in tournament arena', narration: 'Satu kill lagi menuju takhta juara dunia... namun takdir berkata lain.', duration_seconds: 10 },
+        { visual_prompt: 'Dramatic red warning ping 999ms blinking frantically on high-tech gaming monitor', narration: 'Layar membeku. Karakter berjalan di tempat menembus dimensi astral.', duration_seconds: 10 },
+        { visual_prompt: 'Wide shot of neighbor unplugging router to plug in rice cooker', narration: 'Di balik setiap kekalahan legendaris, selalu ada colokan rice cooker yang tak terduga.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Cyberpunk 3D',
+      suggestedVoiceStyle: 'Dramatic Voice'
+    },
+    {
+      title: 'NPC yang Menolak Mati',
+      logline: 'Sebuah karakter NPC di game RPG memutuskan untuk kabur dari quest karena bosan dikalahkan pemain pemula.',
+      characters: ['Geralt si Penjual Potion (NPC)', 'Hero123 (Player Noob)'],
+      scenes: [
+        { visual_prompt: 'Medieval fantasy village marketplace with lively animated characters in anime style', narration: 'Setiap hari, tugasku hanya menjual ramuan 5 gold kepada para pengembara.', duration_seconds: 10 },
+        { visual_prompt: 'NPC packing his bags and jumping over the village barrier into the forbidden forest', narration: 'Tapi hari ini, aku memutuskan untuk menjelajahi peta sendiri.', duration_seconds: 10 },
+        { visual_prompt: 'NPC standing atop a cliff looking down at the legendary dragon with a sword', narration: 'Mungkin saatnya NPC yang menyelamatkan dunia.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Anime',
+      suggestedVoiceStyle: 'Narrator Male'
+    }
+  ],
+  'Meme Sekolah': [
+    {
+      title: 'Ujian Dadakan Jam Terakhir',
+      logline: 'Satu kelas mendadak panik ketika guru matematika tersenyum misterius dan mengeluarkan kertas folio bergaris.',
+      characters: ['Andi (Murid Barisan Belakang)', 'Bu Sri (Guru Matematika Killer)'],
+      scenes: [
+        { visual_prompt: 'Sunny high school classroom in Indonesia, students chatting casually after bell rings', narration: 'Hari Jumat, jam 1 siang. Pikiran semua orang sudah di rumah.', duration_seconds: 10 },
+        { visual_prompt: 'Slow motion dramatic entrance of strict teacher carrying stack of double folio papers', narration: 'Langkah kaki itu mendekat... membawa bencana bernama ujian dadakan.', duration_seconds: 10 },
+        { visual_prompt: 'Panic montage of students desperately exchanging telepathic eye glances', narration: 'Seketika seisi kelas bersatu dalam telepati doa.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Cartoon',
+      suggestedVoiceStyle: 'Dramatic Voice'
+    }
+  ],
+  'Horor Komedi': [
+    {
+      title: 'Kuntilanak Takut Ketinggian',
+      logline: 'Hantu penunggu pohon beringin depresi karena pobia pohon tinggi dan terpaksa nongkrong di pot bunga teras warga.',
+      characters: ['Kunti (Hantu Introvert)', 'Rian (Anak Kos Begadang)'],
+      scenes: [
+        { visual_prompt: 'Dark misty Indonesian village night, an old banyan tree under full moonlight, retro noir lighting', narration: 'Malam jumat kliwon, waktu yang tepat untuk menakuti warga.', duration_seconds: 10 },
+        { visual_prompt: 'Female ghost in white dress sitting nervously on a small potted plant near kos-kosan porch', narration: 'Tapi kalau naik pohon kepala pusing, ya nongkrong di pot lidah buaya saja.', duration_seconds: 10 },
+        { visual_prompt: 'College student opening door offering instant noodles to the confused ghost', narration: 'Siapa sangka, segelas kopi hangat bisa mencairkan suasana alam gaib.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Noir',
+      suggestedVoiceStyle: 'Soft Female'
+    }
+  ],
+  'Kehidupan Kantoran': [
+    {
+      title: 'Revisi Terakhir V99_Final_Real',
+      logline: 'Perjuangan desainer grafis lembur menghadapi feedback klien yang minta warna merah tapi nuansa hijau sejuk.',
+      characters: ['Dimas (Desainer Kelelahan)', 'Pak Bos (Klien Perfeksionis)'],
+      scenes: [
+        { visual_prompt: 'Modern office cubicle at 9 PM with glowing dual monitors and empty coffee cups', narration: 'Tepat jam 5 sore pesan itu masuk: "Tolong ubah sedikit ya Mas".', duration_seconds: 10 },
+        { visual_prompt: 'Extreme close up of mouse clicking save on file labeled final_fix_bismillah99.psd', narration: 'Malam berganti fajar, folder file sudah seperti buku ensiklopedia revisi.', duration_seconds: 10 },
+        { visual_prompt: 'Sunrise through glass office windows illuminating a smiling creative survivor', narration: 'Dan akhirnya, klien memilih draft versi pertama.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Realistic',
+      suggestedVoiceStyle: 'Narrator Male'
+    }
+  ],
+  'Random': [
+    {
+      title: 'Kucing Agen Rahasia Antariksa',
+      logline: 'Ternyata alasan kucing suka menatap dinding kosong adalah karena mereka sedang memantau satelit luar angkasa.',
+      characters: ['Oyen (Komandan Kucing)', 'Whiskers (Teknisi Cyber)'],
+      scenes: [
+        { visual_prompt: 'Orange tabby cat sitting on living room table staring intently into blank wall, cyberpunk holographic reflections in eyes', narration: 'Manusia mengira kami hanya melamun menatap tembok.', duration_seconds: 10 },
+        { visual_prompt: 'Futuristic sci-fi cat spacecraft cockpit orbiting Earth with neon controls', narration: 'Padahal kami sedang mengatur transmisi satelit pertahanan galaksi.', duration_seconds: 10 },
+        { visual_prompt: 'Cat suddenly jumping at a red laser pointer dot on the floor', narration: 'Kecuali saat laser merah itu muncul... misi bisa ditunda.', duration_seconds: 10 }
+      ],
+      suggestedVisualStyle: 'Cyberpunk 3D',
+      suggestedVoiceStyle: 'Dramatic Voice'
+    }
+  ]
+};
+
+function getFallbackIdea(genre) {
+  const list = FALLBACK_IDEAS[genre] || FALLBACK_IDEAS['Random'];
+  const index = Math.floor(Math.random() * list.length);
+  return list[index];
+}
+
 async function generateIdea(req, res) {
   try {
-    const { genre } = req.body;
+    const { genre, provider } = req.body;
     if (!genre) {
       return res.status(400).json({ success: false, error: 'Genre is required' });
     }
@@ -435,6 +525,46 @@ Return a JSON object with these exact fields:
 
 Return ONLY valid JSON, no markdown formatting.`;
 
+    // 1. If provider explicitly is 'gemini'
+    if (provider === 'gemini') {
+      try {
+        const genai = getGenAIClient(req);
+        const text = await callGemini(genai, prompt);
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return res.json({ success: true, provider: 'gemini', idea: JSON.parse(jsonMatch[0]) });
+        return res.json({ success: true, provider: 'gemini', idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
+      } catch (geminiErr) {
+        console.warn('[generateIdea] Gemini explicit call failed:', geminiErr.message);
+        // Fallback to smart curated idea
+        const fallback = getFallbackIdea(genre);
+        return res.json({ success: true, provider: 'fallback', idea: fallback, warning: geminiErr.message });
+      }
+    }
+
+    // 2. If provider explicitly is 'openai'
+    if (provider === 'openai') {
+      try {
+        const openai = getOpenAIClient(req);
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.9,
+          max_tokens: 1500,
+        });
+        if (!response?.choices?.[0]) throw new Error('Invalid OpenAI response');
+        const content = response.choices[0].message.content.trim();
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return res.json({ success: true, provider: 'openai', idea: JSON.parse(jsonMatch[0]) });
+        return res.json({ success: true, provider: 'openai', idea: JSON.parse(content) });
+      } catch (openaiErr) {
+        console.warn('[generateIdea] OpenAI explicit call failed:', openaiErr.message);
+        // Fallback to smart curated idea
+        const fallback = getFallbackIdea(genre);
+        return res.json({ success: true, provider: 'fallback', idea: fallback, warning: openaiErr.message });
+      }
+    }
+
+    // 3. Default / Auto mode: Try OpenAI -> Gemini -> Fallback
     try {
       const openai = getOpenAIClient(req);
       const response = await openai.chat.completions.create({
@@ -443,26 +573,30 @@ Return ONLY valid JSON, no markdown formatting.`;
         temperature: 0.9,
         max_tokens: 1500,
       });
-      if (!response?.choices?.[0]) throw new Error('Invalid OpenAI response');
-      const content = response.choices[0].message.content.trim();
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
-      return res.json({ success: true, idea: JSON.parse(content) });
+      if (response?.choices?.[0]) {
+        const content = response.choices[0].message.content.trim();
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return res.json({ success: true, provider: 'openai', idea: JSON.parse(jsonMatch[0]) });
+        return res.json({ success: true, provider: 'openai', idea: JSON.parse(content) });
+      }
     } catch (e) {
-      console.log('[generateIdea] OpenAI failed, falling back to Gemini:', e.message);
+      console.log('[generateIdea] OpenAI failed, trying Gemini:', e.message);
       try {
         const genai = getGenAIClient(req);
         const text = await callGemini(genai, prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
-        return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
+        if (jsonMatch) return res.json({ success: true, provider: 'gemini', idea: JSON.parse(jsonMatch[0]) });
+        return res.json({ success: true, provider: 'gemini', idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
       } catch (e2) {
-        throw new Error('Both OpenAI and Gemini failed: ' + e2.message);
+        console.log('[generateIdea] Gemini also failed, using smart fallback idea:', e2.message);
+        const fallback = getFallbackIdea(genre);
+        return res.json({ success: true, provider: 'fallback', idea: fallback });
       }
     }
   } catch (error) {
     console.error('Generate idea error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    const fallback = getFallbackIdea(req.body.genre || 'Random');
+    return res.json({ success: true, provider: 'fallback', idea: fallback });
   }
 }
 
