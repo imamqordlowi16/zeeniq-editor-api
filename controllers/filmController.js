@@ -1,7 +1,8 @@
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const FilmJob = require('../models/FilmJob');
 
-// ─── Multi-API Support ────────────────────────────────────────────────────────
+// ─── API Client Helpers ───────────────────────────────────────────────────────
 
 function createOpenAIClient(apiKey) {
   return new OpenAI({ apiKey });
@@ -23,10 +24,6 @@ function getGenAIClient(req) {
   return createGenAIClient(key);
 }
 
-// ─── In-Memory Job Store (replace with Redis in production) ───────────────────
-
-const jobs = new Map();
-
 function generateJobId() {
   return 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
@@ -38,7 +35,6 @@ async function analyzeImage(imageBase64, prompt) {
     const client = getGenAIClient({ headers: {} });
     const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // Extract MIME type and data from base64
     const matches = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!matches) throw new Error('Invalid image format');
 
@@ -47,12 +43,7 @@ async function analyzeImage(imageBase64, prompt) {
 
     const result = await model.generateContent([
       prompt,
-      {
-        inlineData: {
-          data: data,
-          mimeType: mimeType,
-        },
-      },
+      { inlineData: { data, mimeType } },
     ]);
 
     return result.response.text().trim();
@@ -102,7 +93,6 @@ Return valid JSON array only, no markdown formatting.`;
     const content = response.choices[0].message.content.trim();
     return { success: true, idea: JSON.parse(content) };
   } catch (e) {
-    // Fallback to Gemini
     const genaiClient = getGenAIClient(req);
     const model = genaiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent(prompt);
@@ -118,7 +108,6 @@ async function step2_generate_visuals(scenes, options, req) {
   const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const enhancedScenes = [];
 
-  // Analyze character image if provided
   let characterAnalysis = null;
   if (options.characterImageBase64) {
     characterAnalysis = await analyzeImage(options.characterImageBase64,
@@ -129,12 +118,8 @@ async function step2_generate_visuals(scenes, options, req) {
     const scene = scenes[i];
     let visualPrompt = scene.visual_prompt;
 
-    // Inject character analysis into prompt if available
     if (characterAnalysis) {
-      visualPrompt = visualPrompt.replace(
-        /character/gi,
-        `character with: ${characterAnalysis}`
-      );
+      visualPrompt = visualPrompt.replace(/character/gi, `character with: ${characterAnalysis}`);
     }
 
     const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film:
@@ -151,10 +136,7 @@ Provide a detailed art_direction field including: lighting setup, camera angle, 
         const parsed = JSON.parse(jsonMatch[0]);
         artDirection = parsed.art_direction || text;
       }
-      enhancedScenes.push({
-        ...scene,
-        art_direction: artDirection,
-      });
+      enhancedScenes.push({ ...scene, art_direction: artDirection });
     } catch (e) {
       enhancedScenes.push({ ...scene, art_direction: scene.visual_prompt });
     }
@@ -175,49 +157,33 @@ async function step3_generate_audio(scenes, voiceStyle) {
   return { audioUrl, sceneMetadata };
 }
 
-async function executeJob(jobId, options, req) {
-  const job = jobs.get(jobId);
-  if (!job) return;
+async function updateJobProgress(jobId, updates) {
+  await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+}
 
+async function executeJob(jobId, options, req) {
   try {
     // Step 1: Generate Script
-    job.status = 'processing';
-    job.progress = 10;
-    job.stage = 'drafting_script';
-    job.message = 'Drafting script with AI...';
-    jobs.set(jobId, job);
+    await updateJobProgress(jobId, { status: 'processing', progress: 10, stage: 'drafting_script', message: 'Drafting script with AI...' });
 
     const scenes = await step1_generate_script(options, req);
 
     // Step 2: Enhance Visuals
-    job.progress = 40;
-    job.stage = 'generating_visuals';
-    job.message = 'Enhancing visual descriptions...';
-    jobs.set(jobId, job);
+    await updateJobProgress(jobId, { progress: 40, stage: 'generating_visuals', message: 'Enhancing visual descriptions...' });
 
     const enhancedScenes = await step2_generate_visuals(scenes, options, req);
 
     // Step 3: Generate Audio
-    job.progress = 70;
-    job.stage = 'synthesizing_audio';
-    job.message = 'Synthesizing audio narration...';
-    jobs.set(jobId, job);
+    await updateJobProgress(jobId, { progress: 70, stage: 'synthesizing_audio', message: 'Synthesizing audio narration...' });
 
     const { audioUrl, sceneMetadata } = await step3_generate_audio(enhancedScenes, options.voiceStyle);
 
     // Step 4: Assemble Final Film
-    job.progress = 90;
-    job.stage = 'assembling_film';
-    job.message = 'Assembling final film...';
-    jobs.set(jobId, job);
+    await updateJobProgress(jobId, { progress: 90, stage: 'assembling_film', message: 'Assembling final film...' });
 
-    // Complete
-    job.progress = 100;
-    job.stage = 'complete';
-    job.message = 'Film generated successfully!';
-    job.result = {
+    const result = {
       success: true,
-      filmId: job.filmId,
+      filmId: jobId,
       scenes: sceneMetadata,
       audioUrl,
       title: options.title,
@@ -227,12 +193,21 @@ async function executeJob(jobId, options, req) {
       filmTheme: options.filmTheme,
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
+      hasWatermark: !options.isPremium,
     };
-    jobs.set(jobId, job);
+
+    await updateJobProgress(jobId, {
+      progress: 100,
+      stage: 'complete',
+      message: 'Film generated successfully!',
+      status: 'completed',
+      result,
+    });
   } catch (error) {
-    job.status = 'failed';
-    job.message = error.message;
-    jobs.set(jobId, job);
+    await updateJobProgress(jobId, {
+      status: 'failed',
+      message: error.message,
+    });
   }
 }
 
@@ -314,7 +289,6 @@ async function affiliateStep2_generate_visuals(scenes, options, req) {
   const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const enhancedScenes = [];
 
-  // Analyze product image if provided
   let productAnalysis = null;
   if (options.productImageBase64) {
     productAnalysis = await analyzeImage(options.productImageBase64,
@@ -326,10 +300,7 @@ async function affiliateStep2_generate_visuals(scenes, options, req) {
     let visualPrompt = scene.visual_prompt;
 
     if (productAnalysis) {
-      visualPrompt = visualPrompt.replace(
-        /product/gi,
-        `product that ${productAnalysis}`
-      );
+      visualPrompt = visualPrompt.replace(/product/gi, `product that ${productAnalysis}`);
     }
 
     const enhancedPrompt = `Create a promotional visual for ${options.productName}:
@@ -340,10 +311,7 @@ Make it eye-catching, professional, and suitable for ${options.targetPlatform}. 
     try {
       const result = await model.generateContent(enhancedPrompt);
       const enhancedText = result.response.text().trim();
-      enhancedScenes.push({
-        ...scene,
-        enhanced_visual_prompt: enhancedText,
-      });
+      enhancedScenes.push({ ...scene, enhanced_visual_prompt: enhancedText });
     } catch (e) {
       enhancedScenes.push({ ...scene });
     }
@@ -351,41 +319,27 @@ Make it eye-catching, professional, and suitable for ${options.targetPlatform}. 
   return enhancedScenes;
 }
 
-async function executeAffiliateJob(jobId, options, req) {
-  const job = jobs.get(jobId);
-  if (!job) return;
+async function updateAffiliateJobProgress(jobId, updates) {
+  // Affiliate jobs use a different collection - we'll store in FilmJob with a prefix for now
+  // In production, create a separate AffiliateJob model
+  await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+}
 
+async function executeAffiliateJob(jobId, options, req) {
   try {
-    // Step 1: Generate Sales Script
-    job.status = 'processing';
-    job.progress = 10;
-    job.stage = 'writing_sales_script';
-    job.message = 'Writing persuasive sales script...';
-    jobs.set(jobId, job);
+    await updateAffiliateJobProgress(jobId, { status: 'processing', progress: 10, stage: 'writing_sales_script', message: 'Writing persuasive sales script...' });
 
     const scenes = await affiliateStep1_generate_script(options, req);
 
-    // Step 2: Enhance Visuals
-    job.progress = 40;
-    job.stage = 'generating_promotional_visuals';
-    job.message = 'Creating promotional visuals...';
-    jobs.set(jobId, job);
+    await updateAffiliateJobProgress(jobId, { progress: 40, stage: 'generating_promotional_visuals', message: 'Creating promotional visuals...' });
 
     const enhancedScenes = await affiliateStep2_generate_visuals(scenes, options, req);
 
-    // Step 3: Generate Voiceover
-    job.progress = 70;
-    job.stage = 'synthesizing_voiceover';
-    job.message = 'Generating promotional voiceover...';
-    jobs.set(jobId, job);
+    await updateAffiliateJobProgress(jobId, { progress: 70, stage: 'synthesizing_voiceover', message: 'Generating promotional voiceover...' });
 
     const audioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
-    // Step 4: Assemble Final Video
-    job.progress = 90;
-    job.stage = 'adding_cta_banners';
-    job.message = 'Adding CTA banners and assembling...';
-    jobs.set(jobId, job);
+    await updateAffiliateJobProgress(jobId, { progress: 90, stage: 'adding_cta_banners', message: 'Adding CTA banners and assembling...' });
 
     const sceneMetadata = enhancedScenes.map((scene, idx) => ({
       scene_number: scene.scene_number || idx + 1,
@@ -396,32 +350,46 @@ async function executeAffiliateJob(jobId, options, req) {
       banner_text: scene.banner_text || options.ctaType,
     }));
 
-    // Complete
-    job.progress = 100;
-    job.stage = 'complete';
-    job.message = 'Affiliate video generated successfully!';
-    job.result = {
+    const result = {
       success: true,
-      videoId: job.videoId,
+      videoId: jobId,
       scenes: sceneMetadata,
       audioUrl,
       productName: options.productName,
       platform: options.targetPlatform,
       ctaType: options.ctaType,
       createdAt: new Date().toISOString(),
+      hasWatermark: !options.isPremium,
     };
-    jobs.set(jobId, job);
+
+    await updateAffiliateJobProgress(jobId, {
+      progress: 100,
+      stage: 'complete',
+      message: 'Affiliate video generated successfully!',
+      status: 'completed',
+      result,
+    });
   } catch (error) {
-    job.status = 'failed';
-    job.message = error.message;
-    jobs.set(jobId, job);
+    await updateAffiliateJobProgress(jobId, {
+      status: 'failed',
+      message: error.message,
+    });
   }
+}
+
+// ─── Premium / Watermark Detection ───────────────────────────────────────────
+
+function detectUserTier(req) {
+  const hasOpenAIKey = req.headers['x-openai-key'] || process.env.OPENAI_API_KEY;
+  const hasGeminiKey = req.headers['x-gemini-key'] || process.env.GEMINI_API_KEY;
+  const subscriptionToken = req.headers['x-subscription-token'];
+  const isPremiumUser = (hasOpenAIKey && hasGeminiKey) || subscriptionToken === 'premium';
+  return { isPremiumUser, isFreeUser: !isPremiumUser };
 }
 
 // ─── Route Handlers ───────────────────────────────────────────────────────────
 
 async function generateIdea(req, res) {
-  console.log('[DEBUG] generateIdea called, res type:', typeof res, 'res keys:', res ? Object.keys(res) : 'N/A');
   try {
     const { genre } = req.body;
     if (!genre) {
@@ -447,36 +415,28 @@ Return a JSON object with these exact fields:
 Return ONLY valid JSON, no markdown formatting.`;
 
     let openai, genai;
-    console.log('[DEBUG] OPENAI_API_KEY set:', !!process.env.OPENAI_API_KEY, 'length:', process.env.OPENAI_API_KEY?.length || 0);
-    console.log('[DEBUG] GEMINI_API_KEY set:', !!process.env.GEMINI_API_KEY, 'length:', process.env.GEMINI_API_KEY?.length || 0);
     try {
       openai = getOpenAIClient(req);
-      console.log('[DEBUG] OpenAI client created, calling API...');
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.9,
         max_tokens: 1500,
       });
-      console.log('[DEBUG] OpenAI response received');
       if (!response?.choices?.[0]) throw new Error('Invalid OpenAI response');
       const content = response.choices[0].message.content.trim();
       return res.json({ success: true, idea: JSON.parse(content) });
     } catch (e) {
-      console.error('[DEBUG] OpenAI error:', e.message);
       try {
         genai = getGenAIClient(req);
-        console.log('[DEBUG] Gemini client created, calling API...');
         const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const result = await model.generateContent(prompt);
-        console.log('[DEBUG] Gemini response received');
         if (!result?.response) throw new Error('Invalid Gemini response');
         const text = result.response.text().trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) return res.json({ success: true, idea: JSON.parse(jsonMatch[0]) });
         return res.json({ success: true, idea: { title: text.substring(0, 50), logline: text, scenes: [] } });
       } catch (e2) {
-        console.error('[DEBUG] Gemini error:', e2.message);
         throw new Error('Both OpenAI and Gemini failed. Check API keys.');
       }
     }
@@ -495,48 +455,60 @@ async function generateFilm(req, res) {
     }
 
     const jobId = generateJobId();
-    const filmId = 'film_' + Date.now();
-    const options = { userEmail, title, plotType, voiceStyle, visualStyle, filmTheme, logline, characterImageBase64 };
+    const { isPremiumUser, isFreeUser } = detectUserTier(req);
 
-    const job = {
+    // Create FilmJob in MongoDB
+    const job = await FilmJob.create({
       jobId,
-      filmId,
+      filmId: `film_${Date.now()}`,
+      userEmail,
+      prompt: `Title: ${title}, Plot: ${plotType}, Voice: ${voiceStyle}, Visual: ${visualStyle}`,
+      title,
+      plotType,
+      voiceStyle,
+      visualStyle,
+      filmTheme,
+      logline: logline || '',
       status: 'queued',
       progress: 0,
       stage: 'idle',
       message: 'Job queued',
-      result: null,
-      createdAt: new Date().toISOString(),
-    };
-
-    jobs.set(jobId, job);
+      hasWatermark: isFreeUser,
+      createdAt: new Date(),
+    });
 
     // Start async execution
-    executeJob(jobId, options, req);
+    executeJob(jobId, { ...req.body, isPremium: isPremiumUser }, req);
 
-    return res.json({ jobId, status: 'processing' });
+    return res.json({ jobId, status: 'processing', isPremiumUser });
   } catch (error) {
     console.error('Film generation error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
 
-function getFilmStatus(req, res) {
-  const { jobId } = req.params;
-  const job = jobs.get(jobId);
+async function getFilmStatus(req, res) {
+  try {
+    const { jobId } = req.params;
+    const job = await FilmJob.findOne({ jobId });
 
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    return res.json({
+      jobId: job.jobId,
+      status: job.status,
+      progress: job.progress,
+      stage: job.stage,
+      message: job.message,
+      result: job.result,
+      hasWatermark: job.hasWatermark,
+    });
+  } catch (error) {
+    console.error('Get film status error:', error);
+    return res.status(500).json({ error: 'Failed to get job status' });
   }
-
-  return res.json({
-    jobId: job.jobId,
-    status: job.status,
-    progress: job.progress,
-    stage: job.stage,
-    message: job.message,
-    result: job.result,
-  });
 }
 
 async function generateAffiliateVideo(req, res) {
@@ -548,23 +520,23 @@ async function generateAffiliateVideo(req, res) {
     }
 
     const jobId = generateJobId();
-    const videoId = 'video_' + Date.now();
-    const options = { productName, productDescription, productImageBase64, targetPlatform, ctaType };
+    const { isPremiumUser, isFreeUser } = detectUserTier(req);
 
-    const job = {
+    // Use FilmJob for now (in production, create separate AffiliateJob model)
+    const job = await FilmJob.create({
       jobId,
-      videoId,
+      filmId: `affiliate_${Date.now()}`,
+      userEmail: req.body.userEmail || 'unknown',
+      prompt: `Affiliate: ${productName}`,
       status: 'queued',
       progress: 0,
       stage: 'idle',
       message: 'Job queued',
-      result: null,
-      createdAt: new Date().toISOString(),
-    };
+      hasWatermark: isFreeUser,
+      createdAt: new Date(),
+    });
 
-    jobs.set(jobId, job);
-
-    executeAffiliateJob(jobId, options, req);
+    executeAffiliateJob(jobId, { ...req.body, isPremium: isPremiumUser }, req);
 
     return res.json({ jobId, status: 'processing' });
   } catch (error) {
@@ -573,22 +545,28 @@ async function generateAffiliateVideo(req, res) {
   }
 }
 
-function getAffiliateVideoStatus(req, res) {
-  const { jobId } = req.params;
-  const job = jobs.get(jobId);
+async function getAffiliateVideoStatus(req, res) {
+  try {
+    const { jobId } = req.params;
+    const job = await FilmJob.findOne({ jobId });
 
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    return res.json({
+      jobId: job.jobId,
+      status: job.status,
+      progress: job.progress,
+      stage: job.stage,
+      message: job.message,
+      result: job.result,
+      hasWatermark: job.hasWatermark,
+    });
+  } catch (error) {
+    console.error('Get affiliate status error:', error);
+    return res.status(500).json({ error: 'Failed to get job status' });
   }
-
-  return res.json({
-    jobId: job.jobId,
-    status: job.status,
-    progress: job.progress,
-    stage: job.stage,
-    message: job.message,
-    result: job.result,
-  });
 }
 
 // ─── Export ────────────────────────────────────────────────────────────────────
