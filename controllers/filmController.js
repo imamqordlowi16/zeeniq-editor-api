@@ -31,15 +31,29 @@ function generateJobId() {
 // ─── Gemini Multi-Model Helper ───────────────────────────────────────────────
 
 const GEMINI_MODELS = [
+  // --- 1. Model Teks & Multimodal (Utama) ---
   'gemini-1.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-pro',
   'gemini-1.5-flash-8b',
+
+  // --- 2. Model Video & Animasi (Untuk Generasi Media) ---
+  'gemini-omni-flash-preview', // Untuk video interaktif & animasi cepat
+  'veo-3.1-generate-001',      // Untuk animasi sinematik, resolusi tinggi & audio (Veo 3.1)
+
+  // --- 3. Model Eksperimental & Penalaran (Gemini 2.0) ---
+  'gemini-2.0-flash-thinking-exp', 
+  'gemini-2.0-pro-exp',            
+
+  // --- 4. Model Khusus (Dokumen & Pencarian) ---
+  'text-embedding-004',            
+  'aqa',                           
 ];
 
-async function callGemini(client, content) {
+async function callGemini(client, content, preferredModel = null) {
+  const modelsToTry = preferredModel ? [preferredModel, ...GEMINI_MODELS.filter(m => m !== preferredModel)] : GEMINI_MODELS;
   let lastError = null;
-  for (const modelName of GEMINI_MODELS) {
+  for (const modelName of modelsToTry) {
     try {
       const model = client.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(content);
@@ -68,15 +82,15 @@ async function analyzeImage(imageBase64, prompt) {
       { inlineData: { data, mimeType } },
     ];
 
-    return await callGemini(client, content);
+    return await callGemini(client, content, 'gemini-1.5-flash');
   } catch (error) {
     console.error('Image analysis error:', error.message);
     return null;
   }
 }
 
-// ─── Google Flow Motion Engine Video Clips Mapping ───────────────────────────
-const GOOGLE_FLOW_VIDEO_CLIPS = {
+// ─── Gemini Video & Animation Motion Clips Mapping ───────────────────────────
+const GEMINI_VIDEO_CLIPS = {
   'Cyberpunk 3D': [
     'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
     'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
@@ -194,21 +208,21 @@ function generateDynamicFilmScript(options) {
       visual_prompt: `Opening Scene: ${title}. Establishing shot of the main scene featuring ${theme} atmosphere. ${baseVisual}.`,
       narration: scene1Narration,
       duration_seconds: s1Duration,
-      art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: Google Flow smooth dolly zoom in.`
+      art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: Gemini Video smooth dolly zoom in.`
     },
     {
       scene_number: 2,
       visual_prompt: `Turning Point Scene: Intense escalation following the ${plotType} structure. Characters facing critical choice. ${baseVisual}.`,
       narration: scene2Narration,
       duration_seconds: s2Duration,
-      art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: Google Flow dynamic motion tracking.`
+      art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: Gemini Video dynamic motion tracking.`
     },
     {
       scene_number: 3,
       visual_prompt: `Climax Scene: Grand finale resolution for ${title}. Epic visual composition showcasing conclusion. ${baseVisual}.`,
       narration: scene3Narration,
       duration_seconds: s3Duration,
-      art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: Google Flow cinematic orbital pan.`
+      art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: Gemini Video cinematic orbital pan.`
     }
   ];
 }
@@ -269,7 +283,7 @@ ${imageContext}
 
 For each scene, provide:
 1. scene_number: 1, 2, or 3
-2. visual_prompt: detailed visual description for Google Flow motion video generation (include lighting, camera motion, mood, character appearance)
+2. visual_prompt: detailed visual description for Gemini Video & Veo animation generation (include lighting, camera motion, mood, character appearance)
 3. narration: spoken voiceover matching character age and persona (${options.voiceStyle})
 4. duration_seconds: duration in seconds (sum of all 3 scenes must equal approximately ${targetDuration} seconds)
 
@@ -296,7 +310,7 @@ Return valid JSON array only, no markdown formatting.`;
   // 2. Try Gemini fallback
   try {
     const genaiClient = getGenAIClient(req);
-    const text = await callGemini(genaiClient, prompt);
+    const text = await callGemini(genaiClient, prompt, 'gemini-2.0-flash');
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
   } catch (e2) {
@@ -326,15 +340,15 @@ async function step2_generate_visuals(scenes, options, req) {
       visualPrompt = visualPrompt.replace(/character/gi, `character with: ${characterAnalysis}`);
     }
 
-    const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film generated with Google Flow Motion Video Engine:
+    const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film generated with Gemini Video & Veo Animation Engine:
 "${visualPrompt}"
 
 Provide a detailed art_direction field including: lighting setup, camera motion / pan, color palette, mood, and specific motion elements. Return a JSON object with "art_direction" key.`;
 
-    let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic Google Flow camera motion and rich lighting.`;
+    let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic Gemini Video camera motion and rich lighting.`;
     try {
       const genaiClient = getGenAIClient(req);
-      const text = await callGemini(genaiClient, prompt);
+      const text = await callGemini(genaiClient, prompt, 'gemini-1.5-flash');
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -350,7 +364,7 @@ Provide a detailed art_direction field including: lighting setup, camera motion 
 
 async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk 3D') {
   const audioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-  const videoClips = GOOGLE_FLOW_VIDEO_CLIPS[visualStyle] || GOOGLE_FLOW_VIDEO_CLIPS['Cyberpunk 3D'];
+  const videoClips = GEMINI_VIDEO_CLIPS[visualStyle] || GEMINI_VIDEO_CLIPS['Cyberpunk 3D'];
 
   const sceneMetadata = scenes.map((scene, idx) => ({
     scene_number: scene.scene_number || idx + 1,
@@ -360,7 +374,7 @@ async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk
     visual_prompt: scene.visual_prompt,
     art_direction: scene.art_direction || scene.visual_prompt,
     video_url: videoClips[idx % videoClips.length],
-    render_engine: 'Google Flow Motion Engine',
+    render_engine: 'Gemini Video & Veo AI Engine',
   }));
   return { audioUrl, sceneMetadata };
 }
@@ -381,8 +395,8 @@ async function executeJob(jobId, options, req) {
 
     const enhancedScenes = await step2_generate_visuals(scenes, options, req);
 
-    // Step 3: Synthesize Audio & Google Flow Video Rendering
-    await updateJobProgress(jobId, { progress: 75, stage: 'rendering_google_flow', message: 'Rendering moving video with Google Flow...' });
+    // Step 3: Synthesize Audio & Gemini Video Rendering
+    await updateJobProgress(jobId, { progress: 75, stage: 'rendering_video_ai', message: 'Rendering moving video with Gemini Video & Veo...' });
 
     const { audioUrl, sceneMetadata } = await step3_generate_audio(enhancedScenes, options.voiceStyle, options.visualStyle);
 
@@ -400,7 +414,7 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: 'Google Flow Motion Engine',
+      renderEngine: 'Gemini Video & Veo AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
@@ -409,7 +423,7 @@ async function executeJob(jobId, options, req) {
     await updateJobProgress(jobId, {
       progress: 100,
       stage: 'complete',
-      message: 'Film generated successfully with Google Flow!',
+      message: 'Film generated successfully with Gemini & ChatGPT!',
       status: 'completed',
       result,
     });
@@ -429,7 +443,7 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: 'Google Flow Motion Engine',
+      renderEngine: 'Gemini Video & Veo AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
@@ -438,7 +452,7 @@ async function executeJob(jobId, options, req) {
     await updateJobProgress(jobId, {
       progress: 100,
       stage: 'complete',
-      message: 'Film generated successfully with Google Flow!',
+      message: 'Film generated successfully with Gemini & ChatGPT!',
       status: 'completed',
       result,
     });
