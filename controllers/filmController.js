@@ -415,8 +415,16 @@ async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk
   return { audioUrl, sceneMetadata };
 }
 
+const inMemoryJobs = new Map();
+
 async function updateJobProgress(jobId, updates) {
-  await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+  const current = inMemoryJobs.get(jobId) || {};
+  inMemoryJobs.set(jobId, { ...current, ...updates });
+  try {
+    await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+  } catch (err) {
+    console.warn(`[updateJobProgress] MongoDB update warning for ${jobId}:`, err.message);
+  }
 }
 
 // ─── Enhanced Step 3 with Video Generation ────────────────────────────────────
@@ -941,8 +949,7 @@ async function generateFilm(req, res) {
     const jobId = generateJobId();
     const { isPremiumUser, isFreeUser } = detectUserTier(req);
 
-    // Create FilmJob in MongoDB
-    const job = await FilmJob.create({
+    const initialJobData = {
       jobId,
       filmId: `film_${Date.now()}`,
       userEmail,
@@ -959,7 +966,12 @@ async function generateFilm(req, res) {
       message: 'Job queued',
       hasWatermark: isFreeUser,
       createdAt: new Date(),
-    });
+    };
+
+    inMemoryJobs.set(jobId, initialJobData);
+
+    // Create FilmJob in MongoDB
+    FilmJob.create(initialJobData).catch(err => console.warn('[MongoDB create warning]:', err.message));
 
     // Start async execution (non-blocking fire-and-forget)
     executeJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
@@ -975,7 +987,10 @@ async function generateFilm(req, res) {
 async function getFilmStatus(req, res) {
   try {
     const { jobId } = req.params;
-    const job = await FilmJob.findOne({ jobId });
+    let job = inMemoryJobs.get(jobId);
+    if (!job) {
+      job = await FilmJob.findOne({ jobId });
+    }
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
@@ -992,6 +1007,18 @@ async function getFilmStatus(req, res) {
     });
   } catch (error) {
     console.error('Get film status error:', error);
+    const cached = inMemoryJobs.get(req.params.jobId);
+    if (cached) {
+      return res.json({
+        jobId: cached.jobId,
+        status: cached.status,
+        progress: cached.progress,
+        stage: cached.stage,
+        message: cached.message,
+        result: cached.result,
+        hasWatermark: cached.hasWatermark,
+      });
+    }
     return res.status(500).json({ error: 'Failed to get job status' });
   }
 }
@@ -1007,8 +1034,7 @@ async function generateAffiliateVideo(req, res) {
     const jobId = generateJobId();
     const { isPremiumUser, isFreeUser } = detectUserTier(req);
 
-    // Use FilmJob for now (in production, create separate AffiliateJob model)
-    const job = await FilmJob.create({
+    const initialJobData = {
       jobId,
       filmId: `affiliate_${Date.now()}`,
       userEmail: req.body.userEmail || 'unknown',
@@ -1019,7 +1045,12 @@ async function generateAffiliateVideo(req, res) {
       message: 'Job queued',
       hasWatermark: isFreeUser,
       createdAt: new Date(),
-    });
+    };
+
+    inMemoryJobs.set(jobId, initialJobData);
+
+    // Create FilmJob in MongoDB
+    FilmJob.create(initialJobData).catch(err => console.warn('[MongoDB create warning]:', err.message));
 
     // Start async execution (non-blocking fire-and-forget)
     executeAffiliateJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
@@ -1035,7 +1066,10 @@ async function generateAffiliateVideo(req, res) {
 async function getAffiliateVideoStatus(req, res) {
   try {
     const { jobId } = req.params;
-    const job = await FilmJob.findOne({ jobId });
+    let job = inMemoryJobs.get(jobId);
+    if (!job) {
+      job = await FilmJob.findOne({ jobId });
+    }
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
@@ -1052,6 +1086,18 @@ async function getAffiliateVideoStatus(req, res) {
     });
   } catch (error) {
     console.error('Get affiliate status error:', error);
+    const cached = inMemoryJobs.get(req.params.jobId);
+    if (cached) {
+      return res.json({
+        jobId: cached.jobId,
+        status: cached.status,
+        progress: cached.progress,
+        stage: cached.stage,
+        message: cached.message,
+        result: cached.result,
+        hasWatermark: cached.hasWatermark,
+      });
+    }
     return res.status(500).json({ error: 'Failed to get job status' });
   }
 }
