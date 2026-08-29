@@ -182,91 +182,90 @@ const GEMINI_VIDEO_CLIPS = {
   ]
 };
 
-// ─── Dynamic AI Script Synthesizers (Universal Fail-Safe for Free/Plus/Pro) ───
+// ─── Dynamic AI Script Synthesizers (Contextual Semantic Engine) ─────────────
 
 function generateDynamicFilmScript(options) {
-  const title = options.title || 'Film Pendek Tanpa Judul';
-  const visualStyle = options.visualStyle || 'Cyberpunk 3D';
-  const plotType = options.plotType || 'Plot Twist';
+  const title = (options.title || 'Petualangan Menakjubkan').trim();
+  const visualStyle = options.visualStyle || 'Realistic';
+  const plotType = options.plotType || 'Linear';
   const voiceStyle = options.voiceStyle || 'Narrator Male';
   const theme = options.filmTheme || 'Sci-Fi Thriller';
-  const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
+  const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 15, 15), 60);
 
-  // Distribute duration proportionally across 3 scenes up to max 60s
-  const s1Duration = Math.round(targetDuration * 0.30);
-  const s2Duration = Math.round(targetDuration * 0.40);
-  const s3Duration = targetDuration - s1Duration - s2Duration;
+  // Distribute duration proportionally across 3 scenes
+  const s1Duration = Math.max(Math.round(targetDuration * 0.33), 4);
+  const s2Duration = Math.max(Math.round(targetDuration * 0.34), 4);
+  const s3Duration = Math.max(targetDuration - s1Duration - s2Duration, 4);
 
-  const stylePrompts = {
-    'Cyberpunk 3D': 'Futuristic cityscape with high-contrast neon blues and magenta lights, holographic advertisements reflecting on wet asphalt, volumetric fog, Unreal Engine 5 render style',
-    'Anime': 'Studio Ghibli and Makoto Shinkai inspired high-resolution anime aesthetic, lush vibrant lighting, painterly background details, expressive character art',
-    'Realistic': '8K photorealistic cinematic shot, Arri Alexa Mini LF camera, natural depth of field, 35mm master lens, subtle atmospheric haze, moody color grading',
-    'Cartoon': 'Whimsical 3D Pixar-style animation with vibrant colors, soft warm studio lighting, playful character proportions, expressive dynamic angles',
-    'Noir': 'Classic noir black and white with dramatic Venetian blind shadows, high-contrast chiaroscuro lighting, smoky atmosphere, rainy 1940s street aesthetics',
-    '2D Nazecca': 'Mythological ancient 2D tapestry style with golden glowing lines, celestial glyphs, rich earthy and indigo tones, intricate epic linework',
-    'VTuber': 'High-tech virtual idol concert stage with laser effects, colorful anime avatar rendering, sparkling particles, dynamic camera rotation',
-    'Chibi': 'Ultra-cute chibi miniature style with soft pastel colors, oversized expressive eyes, tilt-shift miniature camera effect, fluffy aesthetic',
-    'Retro 90s': 'Vintage 1990s VHS tape texture, CRT scanlines, retro arcade aesthetic, nostalgic chromatic aberration, analog color warmth'
+  // Detailed visual descriptors per style
+  const styleDescriptors = {
+    'Realistic': '8K photorealistic masterpiece shot on 35mm Arri Alexa LF cinema lens, highly detailed textures, natural cinematic depth of field, atmospheric lighting, sharp focus',
+    'Cyberpunk 3D': 'Futuristic Unreal Engine 5 3D render with high-contrast neon cyan and magenta glow, holographic reflections on wet surfaces, volumetric light rays',
+    'Anime': 'Makoto Shinkai and Studio Ghibli inspired anime aesthetic, lush vibrant colors, hand-painted background details, beautiful anime lighting',
+    'Cartoon': '3D Pixar style animated render, vibrant expressive colors, soft warm studio lighting, charming character design',
+    'Noir': 'Cinematic black and white with high-contrast chiaroscuro shadows, dramatic Venetian blind lighting, moody atmospheric rain and smoke',
+    '2D Nazecca': 'Mythological ancient tapestry art style with glowing golden glyphs, intricate indigo linework, celestial atmosphere',
+    'VTuber': 'High-tech virtual idol aesthetic, dynamic concert laser lighting, vibrant anime digital stage, sparkling particles',
+    'Chibi': 'Ultra-cute chibi miniature style, pastel colors, oversized expressive eyes, tilt-shift macro lens blur',
+    'Retro 90s': '1990s VHS tape texture, CRT scanlines, retro arcade aesthetic, nostalgic analog color grading'
   };
 
-  const baseVisual = stylePrompts[visualStyle] || stylePrompts['Cyberpunk 3D'];
+  const baseVisual = styleDescriptors[visualStyle] || styleDescriptors['Realistic'];
+  const cleanSubject = title.replace(/^(sebuah|kisah|film tentang|cerita tentang)\s+/i, '').trim();
 
-  // Tailor narration tone & vocabulary by character age / voice persona
-  let scene1Narration = `Di balik gemerlap dunia ${theme}, sebuah kisah bermula dari rahasia yang tak terduga. ${title}.`;
-  let scene2Narration = `Ketika kenyataan mulai terungkap, setiap langkah kini menjadi pertaruhan antara takdir dan pilihan.`;
-  let scene3Narration = `Pada akhirnya, semua teka-teki menemukan jalannya. Inilah akhir dari perjalanan yang sesungguhnya.`;
+  // Tailor narration tone & vocabulary by character voice persona & theme
+  let scene1Narration = `Di bawah naungan semesta ${theme}, hadirlah ${cleanSubject}. Suasana tampak tenang dan penuh daya tarik sejak awal.`;
+  let scene2Narration = `Namun dinamika ${plotType} mulai terasa ketika ${cleanSubject} mendapati peristiwa mengejutkan yang mengubah segalanya.`;
+  let scene3Narration = `Dengan keberanian luar biasa, ${cleanSubject} berhasil menyelesaikan rintangan, mengukir akhir yang megah di semesta ${theme}.`;
 
-  if (voiceStyle.includes('Anak')) {
-    scene1Narration = `Wah, kalian tahu gak? Cerita seru tentang ${title} ini dimulai dari sebuah rahasia ajaib di dunia ${theme}!`;
-    scene2Narration = `Tiba-tiba suasananya jadi menegangkan banget! Kita harus berani menghadapi rintangan ini bersama-sama!`;
-    scene3Narration = `Hore! Akhirnya semua teka-teki terpecahkan dengan seru! Petualangan yang luar biasa!`;
+  if (voiceStyle.includes('Narrator') || voiceStyle.includes('Pria Dewasa')) {
+    scene1Narration = `Di tengah keheningan semesta ${theme}, hadirlah ${cleanSubject}. Suatu pemandangan yang memikat perhatian sejak detik pertama.`;
+    scene2Narration = `Tiba-tiba, sebuah anomali misterius terdeteksi. ${cleanSubject} kini berhadapan langsung dengan misteri terbesar di hadapannya.`;
+    scene3Narration = `Dengan ketenangan luar biasa, situasi berhasil dikendalikan. Sebuah kisah epik ${cleanSubject} yang takkan terlupakan.`;
+  } else if (voiceStyle.includes('Anak')) {
+    scene1Narration = `Wah, lihat deh! Lucu banget ada ${cleanSubject} yang lagi asyik di dunia ${theme}!`;
+    scene2Narration = `Eh, tapi tiba-tiba ada hal ajaib yang bikin suasananya jadi menegangkan dan seru banget!`;
+    scene3Narration = `Hore! Akhirnya ${cleanSubject} berhasil melewati semua tantangan dengan hebat! Petualangan seru selesai!`;
   } else if (voiceStyle.includes('Remaja')) {
-    scene1Narration = `Gokil sih, awalnya gak ada yang nyangka kalau petualangan tentang ${title} ini bakal sekeren ini di dunia ${theme}.`;
-    scene2Narration = `Pas masuk momen krusial, fix ini saatnya ambil keputusan berani dan pantang menyerah!`;
-    scene3Narration = `Gila beneran, endingnya epic abis! Semua perjuangan akhirnya terbayar lunas.`;
+    scene1Narration = `Gokil sih, awalnya semua terasa santai pas ngeliat ${cleanSubject} di tengah suasana ${theme}.`;
+    scene2Narration = `Pas masuk momen krusial, ternyata ada rahasia besar yang bikin situasi makin intens!`;
+    scene3Narration = `Endingnya beneran pecah abis! ${cleanSubject} sukses nunjukin aksi terbaiknya sampai akhir.`;
   } else if (voiceStyle.includes('Wanita Muda')) {
-    scene1Narration = `Terkadang, langkah terbesar dimulai dari sebuah tekad sederhana. Inilah kisah tentang ${title} di tengah nuansa ${theme}.`;
-    scene2Narration = `Di saat keraguan datang, keyakinan dan intuisi menjadi penunjuk arah yang paling berharga.`;
-    scene3Narration = `Sebuah akhir yang indah membuktikan bahwa setiap proses adalah pembelajaran yang bermakna.`;
-  } else if (voiceStyle.includes('Kakek') || voiceStyle.includes('Elder')) {
-    scene1Narration = `Dari zaman dahulu, alam selalu mengajarkan bahwa kisah ${title} ini menyimpan pesan berharga di semesta ${theme}.`;
-    scene2Narration = `Waktu yang menguji kesabaran jiwa. Di persimpangan inilah kebijaksanaan menentukan segalanya.`;
-    scene3Narration = `Dan seperti aliran sungai yang bermuara ke lautan, kebenaran sejati akan selalu abadi.`;
-  } else if (voiceStyle.includes('Nenek')) {
-    scene1Narration = `Dengarkan cerita ini baik-baik ya, tentang ${title} yang penuh ketulusan di dunia ${theme}.`;
-    scene2Narration = `Meski jalannya berliku, jangan pernah takut, karena kasih sayang dan kebaikan selalu menuntun kita.`;
-    scene3Narration = `Lihatlah, senyuman hangat menutup kisah ini dengan penuh kebahagiaan untuk kita semua.`;
+    scene1Narration = `Terkadang keindahan terbesar bermula dari hal sederhana. Inilah kisah tentang ${cleanSubject} di dunia ${theme}.`;
+    scene2Narration = `Di saat tantangan datang, ketulusan dan insting ${cleanSubject} menjadi penuntun jalan yang tak ternilai.`;
+    scene3Narration = `Sebuah akhir yang manis membuktikan bahwa setiap perjalanan ${cleanSubject} membawa kebahagiaan sejati.`;
   } else if (voiceStyle.includes('Cyber') || voiceStyle.includes('Robot')) {
-    scene1Narration = `Memulai inisialisasi modul naratif: ${title}. Protokol ${theme} terdeteksi aktif pada sektor utama.`;
+    scene1Narration = `Memulai inisialisasi modul naratif: ${cleanSubject}. Protokol ${theme} terdeteksi aktif pada sektor utama.`;
     scene2Narration = `Peringatan: Kalkulasi anomali terdeteksi meningkat tajam. Mengeksekusi penyesuaian algoritma kritis.`;
-    scene3Narration = `Proses kalkulasi selesai dengan sukses. Stabilitas sistem dan resolusi cerita tercapai seratus persen.`;
-  } else if (voiceStyle.includes('Suara Sendiri')) {
-    scene1Narration = `Halo semuanya, ini adalah project film karya saya: ${title}, yang berlatar di dunia ${theme}.`;
-    scene2Narration = `Di titik inilah konflik utama semakin memuncak dan jalan ceritanya semakin seru.`;
-    scene3Narration = `Terima kasih sudah menyaksikan kisah ini sampai selesai, semoga kalian terhibur!`;
+    scene3Narration = `Proses kalkulasi selesai dengan sukses. Stabilitas sistem ${cleanSubject} tercapai seratus persen.`;
   }
+
+  // Create highly tailored 8K visual prompts directly featuring the subject and visual style
+  const s1Visual = `Opening scene of ${cleanSubject} in a vivid environment with subtle ${theme} atmosphere, wide establishing shot, ${baseVisual}`;
+  const s2Visual = `Dramatic turning point focusing on ${cleanSubject} reacting to mysterious glowing ${theme} energy, intense close-up shot, dynamic cinematic angle, ${baseVisual}`;
+  const s3Visual = `Triumphant cinematic finale of ${cleanSubject} basking in majestic resolution lighting, epic cinematic composition, masterpiece scene, ${baseVisual}`;
 
   return [
     {
       scene_number: 1,
-      visual_prompt: `Opening Scene: ${title}. Establishing shot of the main scene featuring ${theme} atmosphere. ${baseVisual}.`,
+      visual_prompt: s1Visual,
       narration: scene1Narration,
       duration_seconds: s1Duration,
-      art_direction: `Color palette: dynamic style contrast. Lighting: soft key light with atmospheric rim light. Camera: Gemini Video smooth dolly zoom in.`
+      art_direction: `Cinematic ${visualStyle} lighting with soft key light, gentle camera dolly zoom in.`
     },
     {
       scene_number: 2,
-      visual_prompt: `Turning Point Scene: Intense escalation following the ${plotType} structure. Characters facing critical choice. ${baseVisual}.`,
+      visual_prompt: s2Visual,
       narration: scene2Narration,
       duration_seconds: s2Duration,
-      art_direction: `Color palette: dramatic tense tones. Lighting: sharp contrasting rim light. Camera: Gemini Video dynamic motion tracking.`
+      art_direction: `High-contrast ${theme} lighting with sharp rim lights, dynamic tracking camera motion.`
     },
     {
       scene_number: 3,
-      visual_prompt: `Climax Scene: Grand finale resolution for ${title}. Epic visual composition showcasing conclusion. ${baseVisual}.`,
+      visual_prompt: s3Visual,
       narration: scene3Narration,
       duration_seconds: s3Duration,
-      art_direction: `Color palette: triumphant golden hour or intense neon bloom. Lighting: volumetric god rays. Camera: Gemini Video cinematic orbital pan.`
+      art_direction: `Triumphant golden volumetric lighting with wide cinematic orbital camera pan.`
     }
   ];
 }
