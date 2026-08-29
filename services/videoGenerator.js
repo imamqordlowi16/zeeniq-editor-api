@@ -94,9 +94,9 @@ async function generateVideo(prompt, style = 'realistic') {
     return null;
   }
 
-  // Poll for completion
+  // Poll for completion (max 12s)
   let result = prediction;
-  const maxAttempts = 20; // 20 * 2s = 40s max
+  const maxAttempts = 6; // 6 * 2s = 12s max
 
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -123,41 +123,40 @@ async function generateVideo(prompt, style = 'realistic') {
       }
     } catch (pollError) {
       console.warn('[VideoGenerator] Poll error:', pollError.message);
-      continue;
+      break;
     }
   }
 
-  console.warn('[VideoGenerator] Timed out waiting for video generation');
+  console.warn('[VideoGenerator] Timed out waiting for video generation, using dynamic AI art backdrop');
   return null;
 }
 
 /**
- * Generate videos for multiple scenes
+ * Generate videos for multiple scenes in parallel
  */
 async function generateFilmVideos(scenes, visualStyle, onProgress) {
-  const results = [];
+  if (typeof onProgress === 'function') {
+    onProgress(75);
+  }
 
-  for (let i = 0; i < scenes.length; i++) {
-    console.log(`[VideoGenerator] Generating scene ${i + 1}/${scenes.length}`);
-    if (typeof onProgress === 'function') {
-      const p = 70 + Math.round((i / scenes.length) * 15);
-      onProgress(p);
-    }
-
+  const results = await Promise.all(scenes.map(async (scene, i) => {
     try {
-      const videoUrl = await generateVideo(scenes[i].visual_prompt, visualStyle);
-      results.push({ video_url: videoUrl, duration: scenes[i].duration_seconds });
-      if (videoUrl && i < scenes.length - 1) {
-        console.log('[VideoGenerator] Waiting 3s before next scene...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
+      const videoUrl = await generateVideo(scene.visual_prompt, visualStyle);
+      return { video_url: videoUrl, duration: scene.duration_seconds };
     } catch (error) {
-      console.warn(`[VideoGenerator] Scene ${i + 1} failed:`, error.message);
-      results.push({ video_url: null, duration: scenes[i].duration_seconds });
+      console.warn(`[VideoGenerator] Scene ${i + 1} error:`, error.message);
+      return { video_url: null, duration: scene.duration_seconds };
     }
+  }));
+
+  if (typeof onProgress === 'function') {
+    onProgress(85);
   }
 
   return results;
 }
 
-module.exports = { generateVideo, generateFilmVideos };
+module.exports = {
+  generateVideo,
+  generateFilmVideos
+};
