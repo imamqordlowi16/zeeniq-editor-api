@@ -964,18 +964,21 @@ async function generateFilm(req, res) {
       visualStyle,
       filmTheme,
       logline: logline || '',
-      status: 'queued',
-      progress: 0,
-      stage: 'idle',
-      message: 'Job queued',
+      status: 'processing',
+      progress: 10,
+      stage: 'starting',
+      message: 'Starting generation...',
       hasWatermark: isFreeUser,
       createdAt: new Date(),
     };
 
     inMemoryJobs.set(jobId, initialJobData);
 
-    // Create FilmJob in MongoDB
-    FilmJob.create(initialJobData).catch(err => console.warn('[MongoDB create warning]:', err.message));
+    try {
+      await FilmJob.create(initialJobData);
+    } catch (dbErr) {
+      console.warn('[MongoDB create warning]:', dbErr.message);
+    }
 
     // Start async execution (non-blocking fire-and-forget)
     executeJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
@@ -991,9 +994,14 @@ async function generateFilm(req, res) {
 async function getFilmStatus(req, res) {
   try {
     const { jobId } = req.params;
-    let job = inMemoryJobs.get(jobId);
-    if (!job) {
+    let job = null;
+    try {
       job = await FilmJob.findOne({ jobId });
+    } catch (e) {}
+
+    const memoryJob = inMemoryJobs.get(jobId);
+    if (memoryJob && (!job || (memoryJob.progress || 0) >= (job.progress || 0))) {
+      job = memoryJob;
     }
 
     if (!job) {
@@ -1043,18 +1051,21 @@ async function generateAffiliateVideo(req, res) {
       filmId: `affiliate_${Date.now()}`,
       userEmail: req.body.userEmail || 'unknown',
       prompt: `Affiliate: ${productName}`,
-      status: 'queued',
-      progress: 0,
-      stage: 'idle',
-      message: 'Job queued',
+      status: 'processing',
+      progress: 10,
+      stage: 'starting',
+      message: 'Starting affiliate video generation...',
       hasWatermark: isFreeUser,
       createdAt: new Date(),
     };
 
     inMemoryJobs.set(jobId, initialJobData);
 
-    // Create FilmJob in MongoDB
-    FilmJob.create(initialJobData).catch(err => console.warn('[MongoDB create warning]:', err.message));
+    try {
+      await FilmJob.create(initialJobData);
+    } catch (dbErr) {
+      console.warn('[MongoDB create warning]:', dbErr.message);
+    }
 
     // Start async execution (non-blocking fire-and-forget)
     executeAffiliateJob(jobId, { ...req.body, isPremium: isPremiumUser }, req)
@@ -1070,9 +1081,14 @@ async function generateAffiliateVideo(req, res) {
 async function getAffiliateVideoStatus(req, res) {
   try {
     const { jobId } = req.params;
-    let job = inMemoryJobs.get(jobId);
-    if (!job) {
+    let job = null;
+    try {
       job = await FilmJob.findOne({ jobId });
+    } catch (e) {}
+
+    const memoryJob = inMemoryJobs.get(jobId);
+    if (memoryJob && (!job || (memoryJob.progress || 0) >= (job.progress || 0))) {
+      job = memoryJob;
     }
 
     if (!job) {
