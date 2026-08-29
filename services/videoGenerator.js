@@ -69,48 +69,37 @@ async function generateVideo(prompt, style = 'realistic') {
       } catch (error) {
         console.warn('[VideoGenerator]', modelName, 'failed:', error.message);
 
+        // If 401 Unauthenticated, token is invalid - fail fast
+        if (error.message?.includes('401') || error.message?.includes('Unauthenticated') || error.message?.includes('token')) {
+          console.warn('[VideoGenerator] Replicate token is unauthorized/expired. Returning null fallback.');
+          return null;
+        }
+
         // Handle rate limiting
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
-          console.log('[VideoGenerator] Rate limited, waiting 15s...');
-          await new Promise(resolve => setTimeout(resolve, 15000));
-
-          try {
-            prediction = await client.predictions.create({
-              model: modelName,
-              input: {
-                prompt: prompt,
-                num_inference_steps: 25,
-                guidance_scale: 7.5,
-                width: 1024,
-                height: 576
-              }
-            });
-            console.log('[VideoGenerator] Retry success');
-            break;
-          } catch (retryError) {
-            console.error('[VideoGenerator] Retry failed:', retryError.message);
-            continue;
-          }
+          console.log('[VideoGenerator] Rate limited, skipping Replicate retry to avoid hanging.');
+          return null;
         }
         continue;
       }
     } catch (error) {
       console.error('[VideoGenerator] Model attempt error:', error.message);
+      if (error.message?.includes('401') || error.message?.includes('Unauthenticated')) return null;
       continue;
     }
   }
 
   if (!prediction) {
-    console.warn('[VideoGenerator] All video models failed, using fallback');
+    console.warn('[VideoGenerator] No video prediction started, using dynamic visual artwork');
     return null;
   }
 
   // Poll for completion
   let result = prediction;
-  const maxAttempts = 60;
+  const maxAttempts = 20; // 20 * 2s = 40s max
 
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     try {
       result = await client.predictions.get(result.id);
@@ -128,7 +117,7 @@ async function generateVideo(prompt, style = 'realistic') {
         return output ? String(output) : null;
       }
 
-      if (result.status === 'failed') {
+      if (result.status === 'failed' || result.status === 'canceled') {
         console.warn('[VideoGenerator] Generation status failed:', result.error);
         return null;
       }
@@ -158,14 +147,13 @@ async function generateFilmVideos(scenes, visualStyle, onProgress) {
     try {
       const videoUrl = await generateVideo(scenes[i].visual_prompt, visualStyle);
       results.push({ video_url: videoUrl, duration: scenes[i].duration_seconds });
+      if (videoUrl && i < scenes.length - 1) {
+        console.log('[VideoGenerator] Waiting 3s before next scene...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     } catch (error) {
       console.warn(`[VideoGenerator] Scene ${i + 1} failed:`, error.message);
       results.push({ video_url: null, duration: scenes[i].duration_seconds });
-    }
-
-    if (i < scenes.length - 1) {
-      console.log('[VideoGenerator] Waiting 5s before next scene...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 

@@ -346,7 +346,7 @@ Return valid JSON array only, no markdown formatting.`;
   // 2. Try Gemini fallback
   try {
     const genaiClient = getGenAIClient(req);
-    const text = await callGemini(genaiClient, prompt, 'gemini-2.0-flash');
+    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
   } catch (e2) {
@@ -358,8 +358,6 @@ Return valid JSON array only, no markdown formatting.`;
 }
 
 async function step2_generate_visuals(scenes, options, req) {
-  const enhancedScenes = [];
-
   let characterAnalysis = null;
   if (options.characterImageBase64) {
     try {
@@ -368,8 +366,7 @@ async function step2_generate_visuals(scenes, options, req) {
     } catch {}
   }
 
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
+  const enhancedScenes = await Promise.all(scenes.map(async (scene, i) => {
     let visualPrompt = scene.visual_prompt || `${options.title} scene ${i + 1}`;
 
     if (characterAnalysis) {
@@ -384,7 +381,7 @@ Provide a detailed art_direction field including: lighting setup, camera motion 
     let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic Gemini Video camera motion and rich lighting.`;
     try {
       const genaiClient = getGenAIClient(req);
-      const text = await callGemini(genaiClient, prompt, 'gemini-1.5-flash');
+      const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -393,8 +390,10 @@ Provide a detailed art_direction field including: lighting setup, camera motion 
     } catch (e) {
       // Keep generated artDirection
     }
-    enhancedScenes.push({ ...scene, visual_prompt: visualPrompt, art_direction: artDirection });
-  }
+
+    return { ...scene, visual_prompt: visualPrompt, art_direction: artDirection };
+  }));
+
   return enhancedScenes;
 }
 
