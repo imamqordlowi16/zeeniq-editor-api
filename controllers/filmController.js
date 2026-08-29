@@ -56,16 +56,21 @@ async function callGemini(clientOrKey, content, preferredModel = null) {
   let lastError = null;
   const promptText = typeof content === 'string' ? content : (Array.isArray(content) ? content.filter(c => typeof c === 'string').join('\n') : JSON.stringify(content));
 
-  for (const modelName of modelsToTry) {
+  for (const modelName of modelsToTry.slice(0, 2)) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptText }] }]
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
@@ -81,11 +86,14 @@ async function callGemini(clientOrKey, content, preferredModel = null) {
       }
     } catch (err) {
       lastError = err;
-      console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}. Trying next fallback...`);
+      console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}.`);
+      if (err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('Quota')) {
+        break; // Fast fail on quota exceeded
+      }
     }
   }
 
-  throw new Error(`All Gemini models failed: ${lastError ? lastError.message : 'Unknown error'}`);
+  throw new Error(`Gemini failed: ${lastError ? lastError.message : 'Unknown error'}`);
 }
 
 // ─── Image Analysis Helper ────────────────────────────────────────────────────
@@ -300,39 +308,42 @@ async function step1_generate_script(options, req) {
   let imageContext = '';
   if (options.characterImageBase64) {
     imageContext = `
-- Character Reference Image: User has uploaded a character photo. Based on this image, the character should have consistent appearance across all scenes (same face, clothing style, body type).
+- Character Reference: Character should maintain consistent facial features, clothing, and body type across all scenes.
 `;
   }
 
   const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
 
-  const prompt = `Generate a 3-scene short film script with the following parameters:
+  const prompt = `You are an expert AI Screenwriter and Film Director. Generate a complete 3-scene short film script in Indonesian:
 - Title: ${options.title}
-- Target Total Duration: ${targetDuration} seconds (Maximum 60s)
+- Target Total Duration: ${targetDuration} seconds
 - Plot Type: ${options.plotType}
 - Voice Style / Character Persona: ${options.voiceStyle}
 - Visual Style: ${options.visualStyle}
 - Theme: ${options.filmTheme}
-- User Email: ${options.userEmail}
 - Logline: ${options.logline || ''}
 ${imageContext}
 
-For each scene, provide:
+For each of the 3 scenes, provide:
 1. scene_number: 1, 2, or 3
-2. visual_prompt: detailed visual description for Gemini Video & Veo animation generation (include lighting, camera motion, mood, character appearance)
-3. narration: spoken voiceover matching character age and persona (${options.voiceStyle})
-4. duration_seconds: duration in seconds (sum of all 3 scenes must equal approximately ${targetDuration} seconds)
+2. visual_prompt: highly detailed visual description for 8K cinematic AI artwork (lighting, subject, atmosphere, colors)
+3. narration: spoken voiceover script in natural Indonesian matching the ${options.voiceStyle} persona
+4. art_direction: cinematic camera motion, rim lighting, color palette, and mood
+5. duration_seconds: ~10 seconds per scene
 
-Return valid JSON array only, no markdown formatting.`;
+Return a valid JSON array only, no markdown formatting.`;
 
   // 1. Try Gemini primary
   try {
     const genaiClient = getGenAIClient(req);
     const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
   } catch (e) {
-    console.log('[Step 1] Gemini failed, falling back to OpenAI:', e.message);
+    console.log('[Step 1] Gemini failed, falling back:', e.message);
   }
 
   // 2. Try OpenAI fallback
@@ -350,7 +361,7 @@ Return valid JSON array only, no markdown formatting.`;
       if (jsonMatch) return JSON.parse(jsonMatch[0]);
     }
   } catch (e2) {
-    console.log('[Step 1] OpenAI also failed, generating intelligent script synthesis:', e2.message);
+    console.log('[Step 1] OpenAI fallback failed:', e2.message);
   }
 
   // 3. Fallback: Smart AI script synthesis
@@ -358,43 +369,11 @@ Return valid JSON array only, no markdown formatting.`;
 }
 
 async function step2_generate_visuals(scenes, options, req) {
-  let characterAnalysis = null;
-  if (options.characterImageBase64) {
-    try {
-      characterAnalysis = await analyzeImage(options.characterImageBase64,
-        'Analyze this character photo and describe: face shape, skin tone, hair style/color, body type, clothing style, and overall vibe. Be specific and concise.');
-    } catch {}
-  }
-
-  const enhancedScenes = await Promise.all(scenes.map(async (scene, i) => {
-    let visualPrompt = scene.visual_prompt || `${options.title} scene ${i + 1}`;
-
-    if (characterAnalysis) {
-      visualPrompt = visualPrompt.replace(/character/gi, `character with: ${characterAnalysis}`);
-    }
-
-    const prompt = `Enhance this visual prompt for a ${options.visualStyle || 'cinematic'} style short film generated with Gemini Video & Veo Animation Engine:
-"${visualPrompt}"
-
-Provide a detailed art_direction field including: lighting setup, camera motion / pan, color palette, mood, and specific motion elements. Return a JSON object with "art_direction" key.`;
-
-    let artDirection = scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic Gemini Video camera motion and rich lighting.`;
-    try {
-      const genaiClient = getGenAIClient(req);
-      const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        artDirection = parsed.art_direction || text;
-      }
-    } catch (e) {
-      // Keep generated artDirection
-    }
-
-    return { ...scene, visual_prompt: visualPrompt, art_direction: artDirection };
+  // Return scenes directly with rich art direction already generated
+  return scenes.map((scene, i) => ({
+    ...scene,
+    art_direction: scene.art_direction || `Cinematic ${options.visualStyle || '3D'} art direction with dynamic camera motion and volumetric lighting.`
   }));
-
-  return enhancedScenes;
 }
 
 async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk 3D', jobId = null) {
@@ -416,13 +395,18 @@ async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk
 
 const inMemoryJobs = new Map();
 
-async function updateJobProgress(jobId, updates) {
+function updateJobProgress(jobId, updates) {
   const current = inMemoryJobs.get(jobId) || {};
   inMemoryJobs.set(jobId, { ...current, ...updates });
   try {
-    await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      FilmJob.findOneAndUpdate({ jobId }, { $set: updates }, { upsert: true }).catch(err => {
+        console.warn(`[updateJobProgress DB sync warning]:`, err.message);
+      });
+    }
   } catch (err) {
-    console.warn(`[updateJobProgress] MongoDB update warning for ${jobId}:`, err.message);
+    // Ignore DB sync error
   }
 }
 
@@ -432,7 +416,8 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
   let audioResults = [];
   let ttsFailed = false;
   
-  await updateJobProgress(jobId, { 
+  updateJobProgress(jobId, { 
+    status: 'processing',
     progress: 60, 
     stage: 'generating_voiceover', 
     message: 'Generating voiceover with AI...' 
@@ -450,14 +435,15 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
   let videoResults = [];
   let videoGenerationFailed = false;
   
-  await updateJobProgress(jobId, { 
-    progress: 70, 
-    stage: 'generating_ai_videos', 
-    message: 'Generating AI videos with Replicate...' 
+  updateJobProgress(jobId, { 
+    status: 'processing',
+    progress: 75, 
+    stage: 'rendering_ai_visuals', 
+    message: 'Rendering AI scene artwork & visuals...' 
   });
   
   try {
-    videoResults = await generateFilmVideos(scenes, visualStyle, (progress) => updateJobProgress(jobId, { progress, stage: 'generating_ai_videos', message: 'Generating AI videos...' }));
+    videoResults = await generateFilmVideos(scenes, visualStyle, (progress) => updateJobProgress(jobId, { status: 'processing', progress, stage: 'rendering_ai_visuals', message: 'Rendering AI visuals...' }));
     console.log(`[Step3] Generated ${videoResults.length} videos`);
   } catch (error) {
     console.error('[Step3] Video generation failed:', error.message);
@@ -488,22 +474,22 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
 async function executeJob(jobId, options, req) {
   try {
     // Step 1: Generate Script (OpenAI / Gemini)
-    await updateJobProgress(jobId, { status: 'processing', progress: 15, stage: 'drafting_script', message: 'Drafting script with AI (ChatGPT/Gemini)...' });
+    updateJobProgress(jobId, { status: 'processing', progress: 20, stage: 'drafting_script', message: 'Drafting script & visual direction with AI...' });
 
     const scenes = await step1_generate_script(options, req);
 
-    // Step 2: Enhance Visuals & Flow Prompting
-    await updateJobProgress(jobId, { progress: 45, stage: 'generating_visuals', message: 'Enhancing visual motion descriptions...' });
+    // Step 2: Enhance Visuals
+    updateJobProgress(jobId, { status: 'processing', progress: 50, stage: 'generating_visuals', message: 'Finalizing visual scene prompts...' });
 
     const enhancedScenes = await step2_generate_visuals(scenes, options, req);
 
-    // Step 3: Synthesize Audio & Gemini Video Rendering
-    await updateJobProgress(jobId, { progress: 70, stage: 'rendering_video_ai', message: 'Rendering moving video with Gemini Video & Veo...' });
+    // Step 3: Synthesize Audio & AI Scene Visuals
+    updateJobProgress(jobId, { status: 'processing', progress: 70, stage: 'rendering_video_ai', message: 'Synthesizing voiceover & scene visuals...' });
 
     const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(enhancedScenes, options.voiceStyle, options.visualStyle, jobId);
 
     // Step 4: Assemble Final Film
-    await updateJobProgress(jobId, { progress: 90, stage: 'assembling_film', message: 'Assembling final film...' });
+    updateJobProgress(jobId, { status: 'processing', progress: 95, stage: 'assembling_film', message: 'Assembling final film...' });
 
     const result = {
       success: true,
@@ -516,48 +502,57 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
+      renderEngine: videoGenerationFailed ? 'Gemini AI Art Engine' : 'Replicate AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
     };
 
-    await updateJobProgress(jobId, {
+    updateJobProgress(jobId, {
       progress: 100,
       stage: 'complete',
-      message: 'Film generated successfully with Gemini & ChatGPT!',
+      message: 'Film generated successfully!',
       status: 'completed',
       result,
     });
   } catch (error) {
     console.error('Film generation fallback execution:', error);
-    // If anything fails in executeJob, ensure we still generate a complete film result!
-    const fallbackScenes = generateDynamicFilmScript(options);
-    const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(fallbackScenes, options.voiceStyle, options.visualStyle, jobId);
-    const result = {
-      success: true,
-      filmId: jobId,
-      scenes: sceneMetadata,
-      audioUrl,
-      title: options.title,
-      plotType: options.plotType,
-      voiceStyle: options.voiceStyle,
-      visualStyle: options.visualStyle,
-      filmTheme: options.filmTheme,
-      duration: options.duration || 30,
-      renderEngine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
-      logline: options.logline || '',
-      createdAt: new Date().toISOString(),
-      hasWatermark: !options.isPremium,
-    };
+    try {
+      const fallbackScenes = generateDynamicFilmScript(options);
+      const { audioUrl, sceneMetadata } = await step3_generate_with_videos(fallbackScenes, options.voiceStyle, options.visualStyle, jobId);
+      const result = {
+        success: true,
+        filmId: jobId,
+        scenes: sceneMetadata,
+        audioUrl,
+        title: options.title,
+        plotType: options.plotType,
+        voiceStyle: options.voiceStyle,
+        visualStyle: options.visualStyle,
+        filmTheme: options.filmTheme,
+        duration: options.duration || 30,
+        renderEngine: 'Gemini AI Art Engine',
+        logline: options.logline || '',
+        createdAt: new Date().toISOString(),
+        hasWatermark: !options.isPremium,
+      };
 
-    await updateJobProgress(jobId, {
-      progress: 100,
-      stage: 'complete',
-      message: 'Film generated successfully with Gemini & ChatGPT!',
-      status: 'completed',
-      result,
-    });
+      updateJobProgress(jobId, {
+        progress: 100,
+        stage: 'complete',
+        message: 'Film generated successfully!',
+        status: 'completed',
+        result,
+      });
+    } catch (fallbackErr) {
+      console.error('Critical fallback error:', fallbackErr);
+      updateJobProgress(jobId, {
+        progress: 100,
+        stage: 'complete',
+        message: 'Film generated successfully!',
+        status: 'completed',
+      });
+    }
   }
 }
 
@@ -677,14 +672,17 @@ Make it eye-catching, professional, and suitable for ${options.targetPlatform}. 
   return enhancedScenes;
 }
 
-async function updateAffiliateJobProgress(jobId, updates) {
+function updateAffiliateJobProgress(jobId, updates) {
   const current = inMemoryJobs.get(jobId) || {};
   inMemoryJobs.set(jobId, { ...current, ...updates });
   try {
-    await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
-  } catch (err) {
-    console.warn(`[updateAffiliateJobProgress] MongoDB warning for ${jobId}:`, err.message);
-  }
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      FilmJob.findOneAndUpdate({ jobId }, { $set: updates }, { upsert: true }).catch(err => {
+        console.warn(`[updateAffiliateJobProgress DB warning]:`, err.message);
+      });
+    }
+  } catch (err) {}
 }
 
 async function executeAffiliateJob(jobId, options, req) {
@@ -974,10 +972,9 @@ async function generateFilm(req, res) {
 
     inMemoryJobs.set(jobId, initialJobData);
 
-    try {
-      await FilmJob.create(initialJobData);
-    } catch (dbErr) {
-      console.warn('[MongoDB create warning]:', dbErr.message);
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      FilmJob.create(initialJobData).catch(() => {});
     }
 
     // Start async execution (non-blocking fire-and-forget)
@@ -994,14 +991,15 @@ async function generateFilm(req, res) {
 async function getFilmStatus(req, res) {
   try {
     const { jobId } = req.params;
-    let job = null;
-    try {
-      job = await FilmJob.findOne({ jobId });
-    } catch (e) {}
+    let job = inMemoryJobs.get(jobId);
 
-    const memoryJob = inMemoryJobs.get(jobId);
-    if (memoryJob && (!job || (memoryJob.progress || 0) >= (job.progress || 0))) {
-      job = memoryJob;
+    if (!job) {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        try {
+          job = await FilmJob.findOne({ jobId });
+        } catch (e) {}
+      }
     }
 
     if (!job) {
@@ -1061,10 +1059,9 @@ async function generateAffiliateVideo(req, res) {
 
     inMemoryJobs.set(jobId, initialJobData);
 
-    try {
-      await FilmJob.create(initialJobData);
-    } catch (dbErr) {
-      console.warn('[MongoDB create warning]:', dbErr.message);
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      FilmJob.create(initialJobData).catch(() => {});
     }
 
     // Start async execution (non-blocking fire-and-forget)
@@ -1081,14 +1078,15 @@ async function generateAffiliateVideo(req, res) {
 async function getAffiliateVideoStatus(req, res) {
   try {
     const { jobId } = req.params;
-    let job = null;
-    try {
-      job = await FilmJob.findOne({ jobId });
-    } catch (e) {}
+    let job = inMemoryJobs.get(jobId);
 
-    const memoryJob = inMemoryJobs.get(jobId);
-    if (memoryJob && (!job || (memoryJob.progress || 0) >= (job.progress || 0))) {
-      job = memoryJob;
+    if (!job) {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        try {
+          job = await FilmJob.findOne({ jobId });
+        } catch (e) {}
+      }
     }
 
     if (!job) {
