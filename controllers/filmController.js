@@ -21,9 +21,9 @@ function getOpenAIClient(req) {
 }
 
 function getGenAIClient(req) {
-  const key = req.headers['x-gemini-key'] || process.env.GEMINI_API_KEY;
-  if (!key) throw new Error('GEMINI_API_KEY not configured. Set x-gemini-key header or GEMINI_API_KEY env var.');
-  return createGenAIClient(key);
+  const key = req?.headers?.['x-gemini-key'] || process.env.GEMINI_API_KEY;
+  if (!key) throw new Error('GEMINI_API_KEY not configured.');
+  return { apiKey: key, getGenerativeModel: (opt) => createGenAIClient(key).getGenerativeModel(opt) };
 }
 
 function generateJobId() {
@@ -33,38 +33,58 @@ function generateJobId() {
 // ─── Gemini Multi-Model Helper ───────────────────────────────────────────────
 
 const GEMINI_MODELS = [
-  // --- 1. Model Teks & Multimodal (Utama) ---
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
-  'gemini-1.5-flash-8b',
-
-  // --- 2. Model Video & Animasi (Untuk Generasi Media) ---
-  'gemini-omni-flash-preview', // Untuk video interaktif & animasi cepat
-  'veo-3.1-generate-001',      // Untuk animasi sinematik, resolusi tinggi & audio (Veo 3.1)
-
-  // --- 3. Model Eksperimental & Penalaran (Gemini 2.0) ---
-  'gemini-2.0-flash-thinking-exp', 
-  'gemini-2.0-pro-exp',            
-
-  // --- 4. Model Khusus (Dokumen & Pencarian) ---
-  'text-embedding-004',            
-  'aqa',                           
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-pro',
 ];
 
-async function callGemini(client, content, preferredModel = null) {
+async function callGemini(clientOrKey, content, preferredModel = null) {
+  let apiKey = process.env.GEMINI_API_KEY;
+  if (typeof clientOrKey === 'string') {
+    apiKey = clientOrKey;
+  } else if (clientOrKey && clientOrKey.apiKey) {
+    apiKey = clientOrKey.apiKey;
+  }
+
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY not configured.');
+  }
+
   const modelsToTry = preferredModel ? [preferredModel, ...GEMINI_MODELS.filter(m => m !== preferredModel)] : GEMINI_MODELS;
   let lastError = null;
+  const promptText = typeof content === 'string' ? content : (Array.isArray(content) ? content.filter(c => typeof c === 'string').join('\n') : JSON.stringify(content));
+
   for (const modelName of modelsToTry) {
     try {
-      const model = client.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(content);
-      return result.response.text().trim();
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textPart = parts.find(p => p.text && !p.thought)?.text || parts[parts.length - 1]?.text;
+
+      if (textPart) {
+        return textPart.trim();
+      }
     } catch (err) {
       lastError = err;
       console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}. Trying next fallback...`);
     }
   }
+
   throw new Error(`All Gemini models failed: ${lastError ? lastError.message : 'Unknown error'}`);
 }
 
@@ -72,19 +92,33 @@ async function callGemini(client, content, preferredModel = null) {
 
 async function analyzeImage(imageBase64, prompt) {
   try {
-    const client = getGenAIClient({ headers: {} });
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) throw new Error('GEMINI_API_KEY not configured');
     const matches = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!matches) throw new Error('Invalid image format');
 
     const mimeType = matches[1];
     const data = matches[2];
 
-    const content = [
-      prompt,
-      { inlineData: { data, mimeType } },
-    ];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data } }
+          ]
+        }]
+      })
+    });
 
-    return await callGemini(client, content, 'gemini-1.5-flash');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const resData = await response.json();
+    const parts = resData.candidates?.[0]?.content?.parts || [];
+    const textPart = parts.find(p => p.text && !p.thought)?.text || parts[parts.length - 1]?.text;
+    return textPart ? textPart.trim() : null;
   } catch (error) {
     console.error('Image analysis error:', error.message);
     return null;
@@ -423,18 +457,24 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
     videoGenerationFailed = true;
   }
   
-  // Build scene metadata with audio and video URLs
-  const sceneMetadata = scenes.map((scene, idx) => ({
-    scene_number: scene.scene_number || idx + 1,
-    narration_text: scene.narration,
-    audio_duration_seconds: scene.duration_seconds || 10,
-    audio_url: audioResults[idx]?.audio_url || '__LOCAL_AUDIO__',
-    visual_prompt: scene.visual_prompt,
-    art_direction: scene.art_direction || scene.visual_prompt,
-    video_url: videoResults[idx]?.video_url || '__LOCAL_VIDEO__',
-    render_engine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
-    tts_status: ttsFailed ? 'fallback' : 'generated',
-  }));
+  // Build scene metadata with audio, AI scene artwork backdrop, and video URLs
+  const sceneMetadata = scenes.map((scene, idx) => {
+    const promptForImage = `${scene.visual_prompt || 'cinematic scene'}, ${visualStyle || 'cinematic'}, 8k resolution, cinematic lighting, masterpiece scene artwork`;
+    const aiImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptForImage)}?width=1280&height=720&nologo=true&seed=${idx + 1}_${Date.now().toString(36)}`;
+    return {
+      scene_number: scene.scene_number || idx + 1,
+      narration_text: scene.narration,
+      audio_duration_seconds: scene.duration_seconds || 10,
+      audio_url: audioResults[idx]?.audio_url || '__LOCAL_AUDIO__',
+      visual_prompt: scene.visual_prompt,
+      art_direction: scene.art_direction || scene.visual_prompt,
+      image_url: aiImageUrl,
+      backdrop_url: aiImageUrl,
+      video_url: videoResults[idx]?.video_url || null,
+      render_engine: videoResults[idx]?.video_url ? 'Replicate AI Engine' : 'Gemini AI Art Engine',
+      tts_status: ttsFailed ? 'fallback' : 'generated',
+    };
+  });
   
   return { audioUrl: '__LOCAL_AUDIO__', sceneMetadata, videoGenerationFailed, ttsFailed };
 }
