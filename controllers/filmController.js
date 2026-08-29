@@ -416,7 +416,7 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
   });
   
   try {
-    videoResults = await generateFilmVideos(scenes, visualStyle);
+    videoResults = await generateFilmVideos(scenes, visualStyle, (progress) => updateJobProgress(jobId, { progress, stage: 'generating_ai_videos', message: 'Generating AI videos...' }));
     console.log(`[Step3] Generated ${videoResults.length} videos`);
   } catch (error) {
     console.error('[Step3] Video generation failed:', error.message);
@@ -451,7 +451,7 @@ async function executeJob(jobId, options, req) {
     const enhancedScenes = await step2_generate_visuals(scenes, options, req);
 
     // Step 3: Synthesize Audio & Gemini Video Rendering
-    await updateJobProgress(jobId, { progress: 75, stage: 'rendering_video_ai', message: 'Rendering moving video with Gemini Video & Veo...' });
+    await updateJobProgress(jobId, { progress: 70, stage: 'rendering_video_ai', message: 'Rendering moving video with Gemini Video & Veo...' });
 
     const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(enhancedScenes, options.voiceStyle, options.visualStyle, jobId);
 
