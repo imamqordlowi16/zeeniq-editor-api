@@ -94,49 +94,49 @@ async function analyzeImage(imageBase64, prompt) {
 // ─── Gemini Video & Animation Motion Clips Mapping ───────────────────────────
 const GEMINI_VIDEO_CLIPS = {
   'Cyberpunk 3D': [
-    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4'
   ],
   'Anime': [
-    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-bright-sun-rays-in-the-forest-41548-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-bright-sun-rays-in-the-forest-41548-large.mp4'
   ],
   'Realistic': [
-    'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-42211-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-highway-traffic-at-night-42215-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-dramatic-skies-over-a-city-42209-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-aerial-view-of-city-traffic-at-night-42211-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-highway-traffic-at-night-42215-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-dramatic-skies-over-a-city-42209-large.mp4'
   ],
   'Cartoon': [
-    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4'
   ],
   'Noir': [
-    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-smoke-in-dark-room-41545-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-smoke-in-dark-room-41545-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4'
   ],
   '2D Nazecca': [
-    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
   ],
   'VTuber': [
-    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
   ],
   'Chibi': [
-    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
   ],
   'Retro 90s': [
-    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
   ]
 };
 
