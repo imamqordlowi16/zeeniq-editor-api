@@ -7,7 +7,7 @@ const FilmJob = require('../models/FilmJob');
 // ─── API Client Helpers ───────────────────────────────────────────────────────
 
 function createOpenAIClient(apiKey) {
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey, timeout: 3000, maxRetries: 0 });
 }
 
 function createGenAIClient(apiKey) {
@@ -15,8 +15,8 @@ function createGenAIClient(apiKey) {
 }
 
 function getOpenAIClient(req) {
-  const key = req.headers['x-openai-key'] || process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY not configured. Set x-openai-key header or OPENAI_API_KEY env var.');
+  const key = req?.headers?.['x-openai-key'] || process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('OPENAI_API_KEY not configured.');
   return createOpenAIClient(key);
 }
 
@@ -325,11 +325,21 @@ For each scene, provide:
 
 Return valid JSON array only, no markdown formatting.`;
 
-  // 1. Try OpenAI if available
+  // 1. Try Gemini primary
+  try {
+    const genaiClient = getGenAIClient(req);
+    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.log('[Step 1] Gemini failed, falling back to OpenAI:', e.message);
+  }
+
+  // 2. Try OpenAI fallback
   try {
     const client = getOpenAIClient(req);
     const response = await client.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.8,
       max_tokens: 2000,
@@ -339,18 +349,8 @@ Return valid JSON array only, no markdown formatting.`;
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) return JSON.parse(jsonMatch[0]);
     }
-  } catch (e) {
-    console.log('[Step 1] OpenAI failed, falling back to Gemini:', e.message);
-  }
-
-  // 2. Try Gemini fallback
-  try {
-    const genaiClient = getGenAIClient(req);
-    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
   } catch (e2) {
-    console.log('[Step 1] Gemini also failed, generating intelligent script synthesis:', e2.message);
+    console.log('[Step 1] OpenAI also failed, generating intelligent script synthesis:', e2.message);
   }
 
   // 3. Fallback: Smart AI script synthesis
@@ -612,10 +612,21 @@ Return a JSON array with 3 scenes:
 
 The tone should be enthusiastic and persuasive, suitable for ${options.targetPlatform}. Use Indonesian language if appropriate for the platform. Return ONLY valid JSON.`;
 
+  // 1. Try Gemini primary
+  try {
+    const genaiClient = getGenAIClient(req);
+    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.log('[Affiliate Step 1] Gemini failed, falling back to OpenAI:', e.message);
+  }
+
+  // 2. Try OpenAI fallback
   try {
     const client = getOpenAIClient(req);
     const response = await client.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.9,
       max_tokens: 1500,
@@ -625,25 +636,14 @@ The tone should be enthusiastic and persuasive, suitable for ${options.targetPla
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) return JSON.parse(jsonMatch[0]);
     }
-  } catch (e) {
-    console.log('[Affiliate Step 1] OpenAI failed, falling back to Gemini:', e.message);
-  }
-
-  try {
-    const genaiClient = getGenAIClient(req);
-    const text = await callGemini(genaiClient, prompt);
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
   } catch (e2) {
-    console.log('[Affiliate Step 1] Gemini also failed, generating smart affiliate script:', e2.message);
+    console.log('[Affiliate Step 1] OpenAI also failed, generating smart affiliate script:', e2.message);
   }
 
   return generateDynamicAffiliateScript(options);
 }
 
 async function affiliateStep2_generate_visuals(scenes, options, req) {
-  const enhancedScenes = [];
-
   let productAnalysis = null;
   if (options.productImageBase64) {
     try {
@@ -652,8 +652,7 @@ async function affiliateStep2_generate_visuals(scenes, options, req) {
     } catch {}
   }
 
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
+  const enhancedScenes = await Promise.all(scenes.map(async (scene, i) => {
     let visualPrompt = scene.visual_prompt || `${options.productName} showcase scene ${i + 1}`;
 
     if (productAnalysis) {
@@ -668,18 +667,24 @@ Make it eye-catching, professional, and suitable for ${options.targetPlatform}. 
     let enhancedVisualPrompt = scene.enhanced_visual_prompt || visualPrompt;
     try {
       const genaiClient = getGenAIClient(req);
-      const enhancedText = await callGemini(genaiClient, enhancedPrompt);
+      const enhancedText = await callGemini(genaiClient, enhancedPrompt, 'gemini-3.6-flash');
       if (enhancedText) enhancedVisualPrompt = enhancedText;
     } catch (e) {}
-    enhancedScenes.push({ ...scene, visual_prompt: visualPrompt, enhanced_visual_prompt: enhancedVisualPrompt });
-  }
+
+    return { ...scene, visual_prompt: visualPrompt, enhanced_visual_prompt: enhancedVisualPrompt };
+  }));
+
   return enhancedScenes;
 }
 
 async function updateAffiliateJobProgress(jobId, updates) {
-  // Affiliate jobs use a different collection - we'll store in FilmJob with a prefix for now
-  // In production, create a separate AffiliateJob model
-  await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+  const current = inMemoryJobs.get(jobId) || {};
+  inMemoryJobs.set(jobId, { ...current, ...updates });
+  try {
+    await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
+  } catch (err) {
+    console.warn(`[updateAffiliateJobProgress] MongoDB warning for ${jobId}:`, err.message);
+  }
 }
 
 async function executeAffiliateJob(jobId, options, req) {
