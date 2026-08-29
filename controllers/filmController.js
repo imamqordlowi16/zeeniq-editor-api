@@ -1,5 +1,7 @@
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateFilmVideos } = require('../services/videoGenerator');
+const { generateSceneAudio } = require('../services/ttsService');
 const FilmJob = require('../models/FilmJob');
 
 // ─── API Client Helpers ───────────────────────────────────────────────────────
@@ -90,52 +92,51 @@ async function analyzeImage(imageBase64, prompt) {
 }
 
 // ─── Gemini Video & Animation Motion Clips Mapping ───────────────────────────
-// Note: using full-size Mixkit video URLs (NOT /preview/ — those are HTML pages)
 const GEMINI_VIDEO_CLIPS = {
   'Cyberpunk 3D': [
-    'https://assets.mixkit.co/videos/42795.mp4',
-    'https://assets.mixkit.co/videos/41986.mp4',
-    'https://assets.mixkit.co/videos/41541.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4'
   ],
   'Anime': [
-    'https://assets.mixkit.co/videos/41551.mp4',
-    'https://assets.mixkit.co/videos/41547.mp4',
-    'https://assets.mixkit.co/videos/41548.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-sun-rays-in-the-forest-41548-large.mp4'
   ],
   'Realistic': [
-    'https://assets.mixkit.co/videos/42211.mp4',
-    'https://assets.mixkit.co/videos/42215.mp4',
-    'https://assets.mixkit.co/videos/42209.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-42211-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-highway-traffic-at-night-42215-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-dramatic-skies-over-a-city-42209-large.mp4'
   ],
   'Cartoon': [
-    'https://assets.mixkit.co/videos/41984.mp4',
-    'https://assets.mixkit.co/videos/41988.mp4',
-    'https://assets.mixkit.co/videos/41984.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4'
   ],
   'Noir': [
-    'https://assets.mixkit.co/videos/41584.mp4',
-    'https://assets.mixkit.co/videos/41545.mp4',
-    'https://assets.mixkit.co/videos/41584.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-smoke-in-dark-room-41545-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4'
   ],
   '2D Nazecca': [
-    'https://assets.mixkit.co/videos/41547.mp4',
-    'https://assets.mixkit.co/videos/41984.mp4',
-    'https://assets.mixkit.co/videos/41551.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
   ],
   'VTuber': [
-    'https://assets.mixkit.co/videos/41541.mp4',
-    'https://assets.mixkit.co/videos/41986.mp4',
-    'https://assets.mixkit.co/videos/42795.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
   ],
   'Chibi': [
-    'https://assets.mixkit.co/videos/41984.mp4',
-    'https://assets.mixkit.co/videos/41988.mp4',
-    'https://assets.mixkit.co/videos/41551.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
   ],
   'Retro 90s': [
-    'https://assets.mixkit.co/videos/41986.mp4',
-    'https://assets.mixkit.co/videos/41541.mp4',
-    'https://assets.mixkit.co/videos/42795.mp4'
+    'https://assets.mixkit.co/videos/preview/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
   ]
 };
 
@@ -363,7 +364,7 @@ Provide a detailed art_direction field including: lighting setup, camera motion 
   return enhancedScenes;
 }
 
-async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk 3D') {
+async function step3_generate_audio(scenes, voiceStyle, visualStyle = 'Cyberpunk 3D', jobId = null) {
   const audioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
   const videoClips = GEMINI_VIDEO_CLIPS[visualStyle] || GEMINI_VIDEO_CLIPS['Cyberpunk 3D'];
 
@@ -384,6 +385,59 @@ async function updateJobProgress(jobId, updates) {
   await FilmJob.findOneAndUpdate({ jobId }, updates, { new: true });
 }
 
+// ─── Enhanced Step 3 with Video Generation ────────────────────────────────────
+async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId) {
+  // Generate TTS audio for each scene
+  let audioResults = [];
+  let ttsFailed = false;
+  
+  await updateJobProgress(jobId, { 
+    progress: 60, 
+    stage: 'generating_voiceover', 
+    message: 'Generating voiceover with AI...' 
+  });
+  
+  try {
+    audioResults = await generateSceneAudio(scenes, 'id-ID');
+    console.log(`[Step3] Generated ${audioResults.length} voiceovers`);
+  } catch (error) {
+    console.error('[Step3] TTS generation failed:', error.message);
+    ttsFailed = true;
+  }
+  
+  // Try to generate videos using Replicate API
+  let videoResults = [];
+  let videoGenerationFailed = false;
+  
+  await updateJobProgress(jobId, { 
+    progress: 70, 
+    stage: 'generating_ai_videos', 
+    message: 'Generating AI videos with Replicate...' 
+  });
+  
+  try {
+    videoResults = await generateFilmVideos(scenes, visualStyle);
+    console.log(`[Step3] Generated ${videoResults.length} videos`);
+  } catch (error) {
+    console.error('[Step3] Video generation failed:', error.message);
+    videoGenerationFailed = true;
+  }
+  
+  // Build scene metadata with audio and video URLs
+  const sceneMetadata = scenes.map((scene, idx) => ({
+    scene_number: scene.scene_number || idx + 1,
+    narration_text: scene.narration,
+    audio_duration_seconds: scene.duration_seconds || 10,
+    audio_url: audioResults[idx]?.audio_url || '__LOCAL_AUDIO__',
+    visual_prompt: scene.visual_prompt,
+    art_direction: scene.art_direction || scene.visual_prompt,
+    video_url: videoResults[idx]?.video_url || '__LOCAL_VIDEO__',
+    render_engine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
+    tts_status: ttsFailed ? 'fallback' : 'generated',
+  }));
+  
+  return { audioUrl: '__LOCAL_AUDIO__', sceneMetadata, videoGenerationFailed, ttsFailed };
+}
 async function executeJob(jobId, options, req) {
   try {
     // Step 1: Generate Script (OpenAI / Gemini)
@@ -399,7 +453,7 @@ async function executeJob(jobId, options, req) {
     // Step 3: Synthesize Audio & Gemini Video Rendering
     await updateJobProgress(jobId, { progress: 75, stage: 'rendering_video_ai', message: 'Rendering moving video with Gemini Video & Veo...' });
 
-    const { audioUrl, sceneMetadata } = await step3_generate_audio(enhancedScenes, options.voiceStyle, options.visualStyle);
+    const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(enhancedScenes, options.voiceStyle, options.visualStyle, jobId);
 
     // Step 4: Assemble Final Film
     await updateJobProgress(jobId, { progress: 90, stage: 'assembling_film', message: 'Assembling final film...' });
@@ -415,7 +469,7 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: 'Gemini Video & Veo AI Engine',
+      renderEngine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
@@ -432,7 +486,7 @@ async function executeJob(jobId, options, req) {
     console.error('Film generation fallback execution:', error);
     // If anything fails in executeJob, ensure we still generate a complete film result!
     const fallbackScenes = generateDynamicFilmScript(options);
-    const { audioUrl, sceneMetadata } = await step3_generate_audio(fallbackScenes, options.voiceStyle, options.visualStyle);
+    const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(fallbackScenes, options.voiceStyle, options.visualStyle, jobId);
     const result = {
       success: true,
       filmId: jobId,
@@ -444,7 +498,7 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: 'Gemini Video & Veo AI Engine',
+      renderEngine: videoGenerationFailed ? 'Gemini Video & Veo AI Engine' : 'Replicate AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
