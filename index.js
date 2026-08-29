@@ -5,6 +5,7 @@ const connectDB = require('./config/db');
 const filmRoutes = require('./routes/filmRoutes');
 const gamingRoutes = require('./routes/gamingRoutes');
 
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -13,6 +14,9 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static temp files (TTS audio, generated clips)
+app.use('/temp', express.static(path.join(__dirname, 'temp')));
 
 app.use('/api', filmRoutes);
 app.use('/api', gamingRoutes);

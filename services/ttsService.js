@@ -39,21 +39,22 @@ async function generateTTS(text, lang = 'id-ID') {
     
     // Save to temp file
     const filename = `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp3`;
-    const filepath = path.join(__dirname, '../../temp', filename);
+    const tempDir = path.join(__dirname, '../temp');
+    const filepath = path.join(tempDir, filename);
+    const publicUrl = `/temp/${filename}`;
     
     // Ensure temp directory exists
-    const tempDir = path.join(__dirname, '../../temp');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
     
     fs.writeFileSync(filepath, audioBuffer);
-    console.log(`[TTS] Audio saved: ${filepath}`);
+    console.log(`[TTS] Audio saved: ${filepath} -> ${publicUrl}`);
     
     // Cache the result
-    ttsCache.set(cacheKey, filepath);
+    ttsCache.set(cacheKey, publicUrl);
     
-    return filepath;
+    return publicUrl;
   } catch (error) {
     console.error('[TTS] Error:', error.message);
     return null;
@@ -136,7 +137,7 @@ async function generateSceneAudio(scenes, lang = 'id-ID') {
  * Clean up old TTS files (called periodically)
  */
 function cleanupOldFiles(maxAgeHours = 24) {
-  const tempDir = path.join(__dirname, '../../temp');
+  const tempDir = path.join(__dirname, '../temp');
   if (!fs.existsSync(tempDir)) return;
   
   const cutoffTime = Date.now() - maxAgeHours * 60 * 60 * 1000;
