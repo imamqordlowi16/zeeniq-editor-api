@@ -227,9 +227,26 @@ function generateDynamicFilmScript(options) {
   const clean = rawTitle.replace(/\s+/g, ' ').replace(/[.,!?]+$/, '').trim();
 
   // Smart English keyword translator for AI image prompts
-  const cleanEnglish = clean
-    .replace(/satu kelas/gi, 'a classroom of students')
+  let cleanEnglish = clean
+    .replace(/seorang koki/gi, 'a master chef in chef hat')
+    .replace(/koki/gi, 'chef')
+    .replace(/di dapur restoran/gi, 'in a restaurant kitchen')
+    .replace(/di dapur/gi, 'in the kitchen')
+    .replace(/dapur/gi, 'kitchen')
+    .replace(/restoran/gi, 'restaurant')
+    .replace(/kompor gas/gi, 'gas cooking stove')
+    .replace(/kompor/gi, 'stove')
+    .replace(/mengeluarkan api besar/gi, 'bursting with huge dramatic fire flames')
+    .replace(/api besar/gi, 'giant blazing fire flames')
+    .replace(/api/gi, 'fire flames')
+    .replace(/wajan penggorengan/gi, 'flying metal frying pan wok')
+    .replace(/wajan/gi, 'frying pan wok')
+    .replace(/terlempar/gi, 'flying in mid-air')
+    .replace(/satu kelas/gi, 'a classroom full of students')
+    .replace(/ruang kelas/gi, 'classroom')
+    .replace(/kelas/gi, 'classroom')
     .replace(/mendadak panik/gi, 'suddenly panicking in shock')
+    .replace(/panik/gi, 'panicking')
     .replace(/ketika/gi, 'as')
     .replace(/saat/gi, 'while')
     .replace(/guru matematika/gi, 'a math teacher')
@@ -241,7 +258,13 @@ function generateDynamicFilmScript(options) {
     .replace(/kertas folio bergaris/gi, 'a stack of lined striped folio exam papers')
     .replace(/kertas folio/gi, 'lined exam folio papers')
     .replace(/kucing kecil lucu/gi, 'cute little fluffy kitten')
-    .replace(/bermain ditaman/gi, 'playing in a vibrant flower park');
+    .replace(/bermain ditaman/gi, 'playing in a vibrant flower park')
+    .replace(/taman/gi, 'park')
+    .replace(/rumah sakit/gi, 'hospital emergency room')
+    .replace(/kamar tidur/gi, 'bedroom')
+    .replace(/jalanan/gi, 'city street')
+    .replace(/hutan/gi, 'dense green forest')
+    .replace(/kantor/gi, 'modern corporate office');
 
   if (clean.length > 25 || clean.includes('ketika') || clean.includes('saat') || clean.includes('mendadak') || clean.includes('panik')) {
     // Scenario decomposition
