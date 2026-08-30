@@ -247,6 +247,8 @@ function generateDynamicFilmScript(options) {
     .replace(/ruang kelas/gi, 'classroom')
     .replace(/kelas/gi, 'classroom')
     .replace(/mendadak panik/gi, 'suddenly panicking in shock')
+    .replace(/mendadak/gi, 'suddenly')
+    .replace(/tiba-tiba/gi, 'suddenly')
     .replace(/panik/gi, 'panicking')
     .replace(/ketika/gi, 'as')
     .replace(/saat/gi, 'while')
