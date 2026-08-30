@@ -38,6 +38,10 @@ async function generateGoogleVeoVideo(prompt, apiKey) {
       if (!res.ok) {
         const errText = await res.text();
         console.warn(`[GoogleVeo] ${model} returned ${res.status}:`, errText.substring(0, 120));
+        if (res.status === 429) {
+          console.log('[GoogleVeo] Veo quota not active on key, falling back to AI visual motion engine');
+          break;
+        }
         continue;
       }
 
