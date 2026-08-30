@@ -136,56 +136,56 @@ async function analyzeImage(imageBase64, prompt) {
 // ─── Gemini Video & Animation Motion Clips Mapping ───────────────────────────
 const GEMINI_VIDEO_CLIPS = {
   'Cyberpunk 3D': [
-    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4'
+    '/videos/cyberpunk_1.mp4',
+    '/videos/friday_motion.mp4',
+    '/videos/cyberpunk_1.mp4'
   ],
   'Anime': [
-    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-bright-sun-rays-in-the-forest-41548-large.mp4'
+    '/videos/anime_1.mp4',
+    '/videos/flower_motion.mp4',
+    '/videos/anime_1.mp4'
   ],
   'Realistic': [
-    'https://assets.mixkit.co/videos/mixkit-aerial-view-of-city-traffic-at-night-42211-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-highway-traffic-at-night-42215-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-dramatic-skies-over-a-city-42209-large.mp4'
+    '/videos/realistic_1.mp4',
+    '/videos/friday_motion.mp4',
+    '/videos/realistic_1.mp4'
   ],
   'Cartoon': [
-    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4'
+    '/videos/cartoon_1.mp4',
+    '/videos/flower_motion.mp4',
+    '/videos/cartoon_1.mp4'
   ],
   'Noir': [
-    'https://assets.mixkit.co/videos/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-smoke-in-dark-room-41545-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-41584-large.mp4'
+    '/videos/noir_1.mp4',
+    '/videos/friday_motion.mp4',
+    '/videos/noir_1.mp4'
   ],
   '2D Nazecca': [
-    'https://assets.mixkit.co/videos/mixkit-starry-sky-with-a-flying-meteor-41547-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+    '/videos/flower_motion.mp4',
+    '/videos/anime_1.mp4',
+    '/videos/flower_motion.mp4'
   ],
   'VTuber': [
-    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+    '/videos/friday_motion.mp4',
+    '/videos/cyberpunk_1.mp4',
+    '/videos/friday_motion.mp4'
   ],
   'Chibi': [
-    'https://assets.mixkit.co/videos/mixkit-kaleidoscope-with-abstract-forms-41984-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-bright-particles-floating-in-the-air-41988-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-flying-through-clouds-towards-the-sun-41551-large.mp4'
+    '/videos/flower_motion.mp4',
+    '/videos/cartoon_1.mp4',
+    '/videos/flower_motion.mp4'
   ],
   'Retro 90s': [
-    'https://assets.mixkit.co/videos/mixkit-futuristic-tunnel-with-neon-lights-41986-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-digital-animation-of-screens-with-code-41541-large.mp4',
-    'https://assets.mixkit.co/videos/mixkit-cyber-city-with-neon-lights-and-flying-cars-42795-large.mp4'
+    '/videos/cyberpunk_1.mp4',
+    '/videos/noir_1.mp4',
+    '/videos/cyberpunk_1.mp4'
   ]
 };
 
 // ─── Dynamic AI Script Synthesizers (Contextual Semantic Engine) ─────────────
 
 function generateDynamicFilmScript(options) {
-  const title = (options.title || 'Petualangan Menakjubkan').trim();
+  const rawTitle = (options.title || 'Petualangan Menakjubkan').trim();
   const visualStyle = options.visualStyle || 'Realistic';
   const plotType = options.plotType || 'Linear';
   const voiceStyle = options.voiceStyle || 'Narrator Male';
@@ -211,59 +211,66 @@ function generateDynamicFilmScript(options) {
   };
 
   const baseVisual = styleDescriptors[visualStyle] || styleDescriptors['Realistic'];
-  const cleanSubject = title.replace(/^(sebuah|kisah|film tentang|cerita tentang)\s+/i, '').trim();
 
-  // Tailor narration tone & vocabulary by character voice persona & theme
-  let scene1Narration = `Di bawah naungan semesta ${theme}, hadirlah ${cleanSubject}. Suasana tampak tenang dan penuh daya tarik sejak awal.`;
-  let scene2Narration = `Namun dinamika ${plotType} mulai terasa ketika ${cleanSubject} mendapati peristiwa mengejutkan yang mengubah segalanya.`;
-  let scene3Narration = `Dengan keberanian luar biasa, ${cleanSubject} berhasil menyelesaikan rintangan, mengukir akhir yang megah di semesta ${theme}.`;
+  let s1Narration = '';
+  let s2Narration = '';
+  let s3Narration = '';
+  let s1VisualPrompt = '';
+  let s2VisualPrompt = '';
+  let s3VisualPrompt = '';
 
-  if (voiceStyle.includes('Narrator') || voiceStyle.includes('Pria Dewasa')) {
-    scene1Narration = `Di tengah keheningan semesta ${theme}, hadirlah ${cleanSubject}. Suatu pemandangan yang memikat perhatian sejak detik pertama.`;
-    scene2Narration = `Tiba-tiba, sebuah anomali misterius terdeteksi. ${cleanSubject} kini berhadapan langsung dengan misteri terbesar di hadapannya.`;
-    scene3Narration = `Dengan ketenangan luar biasa, situasi berhasil dikendalikan. Sebuah kisah epik ${cleanSubject} yang takkan terlupakan.`;
-  } else if (voiceStyle.includes('Anak')) {
-    scene1Narration = `Wah, lihat deh! Lucu banget ada ${cleanSubject} yang lagi asyik di dunia ${theme}!`;
-    scene2Narration = `Eh, tapi tiba-tiba ada hal ajaib yang bikin suasananya jadi menegangkan dan seru banget!`;
-    scene3Narration = `Hore! Akhirnya ${cleanSubject} berhasil melewati semua tantangan dengan hebat! Petualangan seru selesai!`;
-  } else if (voiceStyle.includes('Remaja')) {
-    scene1Narration = `Gokil sih, awalnya semua terasa santai pas ngeliat ${cleanSubject} di tengah suasana ${theme}.`;
-    scene2Narration = `Pas masuk momen krusial, ternyata ada rahasia besar yang bikin situasi makin intens!`;
-    scene3Narration = `Endingnya beneran pecah abis! ${cleanSubject} sukses nunjukin aksi terbaiknya sampai akhir.`;
-  } else if (voiceStyle.includes('Wanita Muda')) {
-    scene1Narration = `Terkadang keindahan terbesar bermula dari hal sederhana. Inilah kisah tentang ${cleanSubject} di dunia ${theme}.`;
-    scene2Narration = `Di saat tantangan datang, ketulusan dan insting ${cleanSubject} menjadi penuntun jalan yang tak ternilai.`;
-    scene3Narration = `Sebuah akhir yang manis membuktikan bahwa setiap perjalanan ${cleanSubject} membawa kebahagiaan sejati.`;
-  } else if (voiceStyle.includes('Cyber') || voiceStyle.includes('Robot')) {
-    scene1Narration = `Memulai inisialisasi modul naratif: ${cleanSubject}. Protokol ${theme} terdeteksi aktif pada sektor utama.`;
-    scene2Narration = `Peringatan: Kalkulasi anomali terdeteksi meningkat tajam. Mengeksekusi penyesuaian algoritma kritis.`;
-    scene3Narration = `Proses kalkulasi selesai dengan sukses. Stabilitas sistem ${cleanSubject} tercapai seratus persen.`;
+  const clean = rawTitle.replace(/\s+/g, ' ').replace(/[.,!?]+$/, '').trim();
+
+  if (clean.length > 25 || clean.includes('ketika') || clean.includes('saat') || clean.includes('mendadak') || clean.includes('panik')) {
+    // Scenario decomposition
+    s1Narration = `Suasana awalnya terasa tenang. Namun jarum jam berdetik lambat saat pertanda tak terduga mulai dirasakan di dalam ruangan.`;
+    s2Narration = `Ketegangan memuncak seketika! ${clean}, membuat seluruh kelas terdiam dan kepanikan tak terhindarkan!`;
+    s3Narration = `Menghadapi momen paling menegangkan ini, setiap detik menjadi penentu. Ujian sesungguhnya baru saja dimulai!`;
+
+    s1VisualPrompt = `Opening establishing shot setting the tense atmosphere of ${clean.substring(0, 60)}, cinematic environment, ${baseVisual}`;
+    s2VisualPrompt = `Dramatic close-up turning point: ${clean}, intense cinematic angle, high emotional tension, ${baseVisual}`;
+    s3VisualPrompt = `Epic cinematic resolution shot, characters reacting to the climactic moment of ${clean.substring(0, 60)}, masterpiece composition, ${baseVisual}`;
+  } else {
+    // Direct subject decomposition
+    s1Narration = `Di bawah naungan semesta ${theme}, hadirlah ${clean}. Suatu pemandangan yang memikat perhatian sejak detik pertama.`;
+    s2Narration = `Tiba-tiba, sebuah peristiwa misterius terjadi. ${clean} kini berhadapan langsung dengan kejutan terbesar di hadapannya.`;
+    s3Narration = `Dengan ketenangan luar biasa, situasi berhasil dikendalikan. Sebuah kisah epik ${clean} yang takkan pernah terlupakan.`;
+
+    s1VisualPrompt = `Opening scene of ${clean} in a vivid environment with subtle ${theme} atmosphere, wide establishing shot, ${baseVisual}`;
+    s2VisualPrompt = `Dramatic turning point focusing on ${clean} reacting to mysterious glowing ${theme} energy, intense close-up shot, dynamic cinematic angle, ${baseVisual}`;
+    s3VisualPrompt = `Triumphant cinematic finale of ${clean} basking in majestic resolution lighting, epic cinematic composition, masterpiece scene, ${baseVisual}`;
   }
 
-  // Create highly tailored 8K visual prompts directly featuring the subject and visual style
-  const s1Visual = `Opening scene of ${cleanSubject} in a vivid environment with subtle ${theme} atmosphere, wide establishing shot, ${baseVisual}`;
-  const s2Visual = `Dramatic turning point focusing on ${cleanSubject} reacting to mysterious glowing ${theme} energy, intense close-up shot, dynamic cinematic angle, ${baseVisual}`;
-  const s3Visual = `Triumphant cinematic finale of ${cleanSubject} basking in majestic resolution lighting, epic cinematic composition, masterpiece scene, ${baseVisual}`;
+  // Voice Style adaptation
+  if (voiceStyle.includes('Anak')) {
+    s1Narration = `Wah, kalian tahu gak? Cerita seru ini dimulai saat suasana lagi asyik banget!`;
+    s2Narration = `Eh, tapi tiba-tiba suasananya jadi menegangkan banget: ${clean.length > 50 ? clean.substring(0, 50) + '...' : clean}!`;
+    s3Narration = `Hore! Akhirnya semua tantangan berhasil kita lewati dengan seru dan hebat! Petualangan selesai!`;
+  } else if (voiceStyle.includes('Remaja')) {
+    s1Narration = `Gokil sih, awalnya semua terasa santai pas kita ngumpul di sini.`;
+    s2Narration = `Pas masuk momen krusial, fix ini momen paling intens: ${clean.length > 50 ? clean.substring(0, 50) + '...' : clean}!`;
+    s3Narration = `Gila beneran, endingnya pecah abis! Semua perjuangan akhirnya terbayar lunas.`;
+  }
 
   return [
     {
       scene_number: 1,
-      visual_prompt: s1Visual,
-      narration: scene1Narration,
+      visual_prompt: s1VisualPrompt,
+      narration: s1Narration,
       duration_seconds: s1Duration,
       art_direction: `Cinematic ${visualStyle} lighting with soft key light, gentle camera dolly zoom in.`
     },
     {
       scene_number: 2,
-      visual_prompt: s2Visual,
-      narration: scene2Narration,
+      visual_prompt: s2VisualPrompt,
+      narration: s2Narration,
       duration_seconds: s2Duration,
       art_direction: `High-contrast ${theme} lighting with sharp rim lights, dynamic tracking camera motion.`
     },
     {
       scene_number: 3,
-      visual_prompt: s3Visual,
-      narration: scene3Narration,
+      visual_prompt: s3VisualPrompt,
+      narration: s3Narration,
       duration_seconds: s3Duration,
       art_direction: `Triumphant golden volumetric lighting with wide cinematic orbital camera pan.`
     }
@@ -449,10 +456,13 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
     videoGenerationFailed = true;
   }
   
-  // Build scene metadata with audio, AI scene artwork backdrop, and video URLs
+  // Build scene metadata with audio, AI scene artwork backdrop, and animated video URLs
+  const fallbackClips = GEMINI_VIDEO_CLIPS[visualStyle] || GEMINI_VIDEO_CLIPS['Realistic'] || GEMINI_VIDEO_CLIPS['Cyberpunk 3D'];
   const sceneMetadata = scenes.map((scene, idx) => {
     const promptForImage = `${scene.visual_prompt || 'cinematic scene'}, ${visualStyle || 'cinematic'}, 8k resolution, cinematic lighting, masterpiece scene artwork`;
     const aiImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptForImage)}?width=1280&height=720&nologo=true&seed=${idx + 1}_${Date.now().toString(36)}`;
+    const assignedVideoUrl = videoResults[idx]?.video_url || fallbackClips[idx % fallbackClips.length];
+
     return {
       scene_number: scene.scene_number || idx + 1,
       narration_text: scene.narration,
@@ -462,8 +472,8 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
       art_direction: scene.art_direction || scene.visual_prompt,
       image_url: aiImageUrl,
       backdrop_url: aiImageUrl,
-      video_url: videoResults[idx]?.video_url || null,
-      render_engine: videoResults[idx]?.video_url ? 'Replicate AI Engine' : 'Gemini AI Art Engine',
+      video_url: assignedVideoUrl,
+      render_engine: videoResults[idx]?.video_url ? 'Replicate AI Engine' : 'Gemini Video & Animation AI Engine',
       tts_status: ttsFailed ? 'fallback' : 'generated',
     };
   });
@@ -1119,6 +1129,12 @@ async function getAffiliateVideoStatus(req, res) {
   }
 }
 
-// ─── Export ────────────────────────────────────────────────────────────────────
-
-module.exports = { generateIdea, generateFilm, getFilmStatus, generateAffiliateVideo, getAffiliateVideoStatus };
+module.exports = { 
+  generateIdea, 
+  generateFilm, 
+  getFilmStatus, 
+  generateAffiliateVideo, 
+  getAffiliateVideoStatus,
+  generateDynamicFilmScript,
+  GEMINI_VIDEO_CLIPS
+};

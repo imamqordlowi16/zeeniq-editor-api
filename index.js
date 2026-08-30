@@ -17,6 +17,7 @@ app.use(express.json());
 
 // Serve static temp files (TTS audio, generated clips)
 app.use('/temp', express.static(path.join(__dirname, 'temp')));
+app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
 app.use('/api', filmRoutes);
 app.use('/api', gamingRoutes);
