@@ -40,7 +40,7 @@ const GEMINI_MODELS = [
   'gemini-2.5-pro',
 ];
 
-async function callGemini(clientOrKey, content, preferredModel = null) {
+async function callGemini(clientOrKey, content, preferredModel = null, jsonMode = false) {
   let apiKey = process.env.GEMINI_API_KEY;
   if (typeof clientOrKey === 'string') {
     apiKey = clientOrKey;
@@ -56,18 +56,23 @@ async function callGemini(clientOrKey, content, preferredModel = null) {
   let lastError = null;
   const promptText = typeof content === 'string' ? content : (Array.isArray(content) ? content.filter(c => typeof c === 'string').join('\n') : JSON.stringify(content));
 
-  for (const modelName of modelsToTry.slice(0, 2)) {
+  const bodyPayload = {
+    contents: [{ parts: [{ text: promptText }] }]
+  };
+  if (jsonMode) {
+    bodyPayload.generationConfig = { responseMimeType: 'application/json' };
+  }
+
+  for (const modelName of modelsToTry.slice(0, 3)) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        }),
+        body: JSON.stringify(bodyPayload),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
@@ -88,7 +93,7 @@ async function callGemini(clientOrKey, content, preferredModel = null) {
       lastError = err;
       console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}.`);
       if (err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('Quota')) {
-        break; // Fast fail on quota exceeded
+        continue;
       }
     }
   }
@@ -221,24 +226,41 @@ function generateDynamicFilmScript(options) {
 
   const clean = rawTitle.replace(/\s+/g, ' ').replace(/[.,!?]+$/, '').trim();
 
+  // Smart English keyword translator for AI image prompts
+  const cleanEnglish = clean
+    .replace(/satu kelas/gi, 'a classroom of students')
+    .replace(/mendadak panik/gi, 'suddenly panicking in shock')
+    .replace(/ketika/gi, 'as')
+    .replace(/saat/gi, 'while')
+    .replace(/guru matematika/gi, 'a math teacher')
+    .replace(/guru/gi, 'the teacher')
+    .replace(/tersenyum misterius/gi, 'smiling mysteriously')
+    .replace(/senyum misterius/gi, 'mysterious smile')
+    .replace(/dan/gi, 'and')
+    .replace(/mengeluarkan/gi, 'holding up')
+    .replace(/kertas folio bergaris/gi, 'a stack of lined striped folio exam papers')
+    .replace(/kertas folio/gi, 'lined exam folio papers')
+    .replace(/kucing kecil lucu/gi, 'cute little fluffy kitten')
+    .replace(/bermain ditaman/gi, 'playing in a vibrant flower park');
+
   if (clean.length > 25 || clean.includes('ketika') || clean.includes('saat') || clean.includes('mendadak') || clean.includes('panik')) {
     // Scenario decomposition
     s1Narration = `Suasana awalnya terasa tenang. Namun jarum jam berdetik lambat saat pertanda tak terduga mulai dirasakan di dalam ruangan.`;
     s2Narration = `Ketegangan memuncak seketika! ${clean}, membuat seluruh kelas terdiam dan kepanikan tak terhindarkan!`;
     s3Narration = `Menghadapi momen paling menegangkan ini, setiap detik menjadi penentu. Ujian sesungguhnya baru saja dimulai!`;
 
-    s1VisualPrompt = `Opening establishing shot setting the tense atmosphere of ${clean.substring(0, 60)}, cinematic environment, ${baseVisual}`;
-    s2VisualPrompt = `Dramatic close-up turning point: ${clean}, intense cinematic angle, high emotional tension, ${baseVisual}`;
-    s3VisualPrompt = `Epic cinematic resolution shot, characters reacting to the climactic moment of ${clean.substring(0, 60)}, masterpiece composition, ${baseVisual}`;
+    s1VisualPrompt = `Opening cinematic establishing shot setting the tense atmosphere of ${cleanEnglish}, quiet room environment, ${baseVisual}`;
+    s2VisualPrompt = `Dramatic close-up turning point: ${cleanEnglish}, intense cinematic angle, high emotional tension, ${baseVisual}`;
+    s3VisualPrompt = `Epic cinematic resolution shot, characters reacting to the climax of ${cleanEnglish}, masterpiece composition, ${baseVisual}`;
   } else {
     // Direct subject decomposition
     s1Narration = `Di bawah naungan semesta ${theme}, hadirlah ${clean}. Suatu pemandangan yang memikat perhatian sejak detik pertama.`;
     s2Narration = `Tiba-tiba, sebuah peristiwa misterius terjadi. ${clean} kini berhadapan langsung dengan kejutan terbesar di hadapannya.`;
     s3Narration = `Dengan ketenangan luar biasa, situasi berhasil dikendalikan. Sebuah kisah epik ${clean} yang takkan pernah terlupakan.`;
 
-    s1VisualPrompt = `Opening scene of ${clean} in a vivid environment with subtle ${theme} atmosphere, wide establishing shot, ${baseVisual}`;
-    s2VisualPrompt = `Dramatic turning point focusing on ${clean} reacting to mysterious glowing ${theme} energy, intense close-up shot, dynamic cinematic angle, ${baseVisual}`;
-    s3VisualPrompt = `Triumphant cinematic finale of ${clean} basking in majestic resolution lighting, epic cinematic composition, masterpiece scene, ${baseVisual}`;
+    s1VisualPrompt = `Opening scene of ${cleanEnglish} in a vivid environment with subtle ${theme} atmosphere, wide establishing shot, ${baseVisual}`;
+    s2VisualPrompt = `Dramatic turning point focusing on ${cleanEnglish} reacting to mysterious glowing ${theme} energy, intense close-up shot, dynamic cinematic angle, ${baseVisual}`;
+    s3VisualPrompt = `Triumphant cinematic finale of ${cleanEnglish} basking in majestic resolution lighting, epic cinematic composition, masterpiece scene, ${baseVisual}`;
   }
 
   // Voice Style adaptation
@@ -320,29 +342,28 @@ async function step1_generate_script(options, req) {
 
   const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
 
-  const prompt = `You are an expert AI Screenwriter and Film Director. Generate a complete 3-scene short film script in Indonesian:
-- Title: ${options.title}
+  const prompt = `You are an expert AI Screenwriter and Film Director. Generate a complete 3-scene short film script based on this user story:
+- Story Concept / Title: ${options.title}
 - Target Total Duration: ${targetDuration} seconds
 - Plot Type: ${options.plotType}
 - Voice Style / Character Persona: ${options.voiceStyle}
 - Visual Style: ${options.visualStyle}
-- Theme: ${options.filmTheme}
+- Film Theme: ${options.filmTheme}
 - Logline: ${options.logline || ''}
 ${imageContext}
 
-For each of the 3 scenes, provide:
-1. scene_number: 1, 2, or 3
-2. visual_prompt: highly detailed visual description for 8K cinematic AI artwork (lighting, subject, atmosphere, colors)
-3. narration: spoken voiceover script in natural Indonesian matching the ${options.voiceStyle} persona
-4. art_direction: cinematic camera motion, rim lighting, color palette, and mood
-5. duration_seconds: ~10 seconds per scene
+CRITICAL RULES:
+1. "narration": Spoken narration in natural, dramatic Indonesian specifically narrating this exact story across 3 progressive scenes (Scene 1: setup/opening, Scene 2: the turning point/climax and surprise event causing tension, Scene 3: the climax resolution / final action).
+2. "visual_prompt": Highly detailed ENGLISH prompt describing the visual scene for AI image generator (MUST accurately portray the specific characters, subjects, actions, environment, ${options.visualStyle} aesthetic, Unreal Engine 5 render, cinematic lighting, 8k resolution).
+3. "art_direction": Cinematic camera motion, lighting style, color palette.
+4. "duration_seconds": ~10 seconds per scene.
 
-Return a valid JSON array only, no markdown formatting.`;
+Return ONLY a JSON array with 3 objects: [{ "scene_number": 1, "narration": "...", "visual_prompt": "...", "art_direction": "...", "duration_seconds": 10 }]`;
 
-  // 1. Try Gemini primary
+  // 1. Try Gemini primary with jsonMode
   try {
     const genaiClient = getGenAIClient(req);
-    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash');
+    const text = await callGemini(genaiClient, prompt, 'gemini-3.6-flash', true);
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -462,12 +483,11 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
     videoGenerationFailed = true;
   }
   
-  // Build scene metadata with audio, AI scene artwork backdrop, and animated video URLs
-  const fallbackClips = GEMINI_VIDEO_CLIPS[visualStyle] || GEMINI_VIDEO_CLIPS['Realistic'] || GEMINI_VIDEO_CLIPS['Cyberpunk 3D'];
+  // Build scene metadata with audio, AI scene artwork backdrop, and true AI video URLs
   const sceneMetadata = scenes.map((scene, idx) => {
     const promptForImage = `${scene.visual_prompt || 'cinematic scene'}, ${visualStyle || 'cinematic'}, 8k resolution, cinematic lighting, masterpiece scene artwork`;
     const aiImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptForImage)}?width=1280&height=720&nologo=true&seed=${idx + 1}_${Date.now().toString(36)}`;
-    const assignedVideoUrl = videoResults[idx]?.video_url || fallbackClips[idx % fallbackClips.length];
+    const realVideoUrl = videoResults[idx]?.video_url || null;
 
     return {
       scene_number: scene.scene_number || idx + 1,
@@ -478,8 +498,8 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
       art_direction: scene.art_direction || scene.visual_prompt,
       image_url: aiImageUrl,
       backdrop_url: aiImageUrl,
-      video_url: assignedVideoUrl,
-      render_engine: videoResults[idx]?.video_url ? (videoResults[idx].video_url.includes('google') || videoResults[idx].video_url.includes('veo') ? 'Google Veo AI Engine' : 'Replicate AI Engine') : 'Google Flow & Gemini Video AI Engine',
+      video_url: realVideoUrl,
+      render_engine: realVideoUrl ? (realVideoUrl.includes('google') || realVideoUrl.includes('veo') ? 'Google Veo AI Engine' : 'Replicate AI Engine') : 'Gemini AI Art Engine',
       tts_status: ttsFailed ? 'fallback' : 'generated',
     };
   });
