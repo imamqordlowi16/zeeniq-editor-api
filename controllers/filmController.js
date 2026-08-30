@@ -494,8 +494,8 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
   });
   
   try {
-    audioResults = await generateSceneAudio(scenes, 'id-ID');
-    console.log(`[Step3] Generated ${audioResults.length} voiceovers`);
+    audioResults = await generateSceneAudio(scenes, 'id-ID', voiceStyle);
+    console.log(`[Step3] Generated ${audioResults.length} voiceovers with style: ${voiceStyle}`);
   } catch (error) {
     console.error('[Step3] TTS generation failed:', error.message);
     ttsFailed = true;
