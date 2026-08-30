@@ -93,7 +93,8 @@ async function callGemini(clientOrKey, content, preferredModel = null, jsonMode 
       lastError = err;
       console.warn(`[Gemini] Model ${modelName} attempt failed: ${err.message}.`);
       if (err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('Quota')) {
-        continue;
+        console.log('[Gemini] Key quota exhausted, breaking to fast AI script synthesizer.');
+        break;
       }
     }
   }
