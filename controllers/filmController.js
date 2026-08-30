@@ -267,14 +267,14 @@ function generateDynamicFilmScript(options) {
     .replace(/kantor/gi, 'modern corporate office');
 
   if (clean.length > 25 || clean.includes('ketika') || clean.includes('saat') || clean.includes('mendadak') || clean.includes('panik')) {
-    // Scenario decomposition
-    s1Narration = `Suasana awalnya terasa tenang. Namun jarum jam berdetik lambat saat pertanda tak terduga mulai dirasakan di dalam ruangan.`;
-    s2Narration = `Ketegangan memuncak seketika! ${clean}, membuat seluruh kelas terdiam dan kepanikan tak terhindarkan!`;
-    s3Narration = `Menghadapi momen paling menegangkan ini, setiap detik menjadi penentu. Ujian sesungguhnya baru saja dimulai!`;
+    // Universal scenario decomposition
+    s1Narration = `Suasana awalnya berlangsung normal. Namun detik demi detik berlalu saat pertanda tak terduga mulai terjadi di lokasi.`;
+    s2Narration = `Ketegangan memuncak seketika! ${clean}, membuat semua orang panik dan situasi menjadi sangat genting!`;
+    s3Narration = `Menghadapi momen paling menegangkan ini, setiap detik menjadi penentu keberhasilan untuk mengendalikan keadaan!`;
 
-    s1VisualPrompt = `Opening cinematic establishing shot setting the tense atmosphere of ${cleanEnglish}, quiet room environment, ${baseVisual}`;
-    s2VisualPrompt = `Dramatic close-up turning point: ${cleanEnglish}, intense cinematic angle, high emotional tension, ${baseVisual}`;
-    s3VisualPrompt = `Epic cinematic resolution shot, characters reacting to the climax of ${cleanEnglish}, masterpiece composition, ${baseVisual}`;
+    s1VisualPrompt = `Opening cinematic establishing shot: ${cleanEnglish}, realistic environment, ${baseVisual}`;
+    s2VisualPrompt = `Dramatic close-up climax action shot: ${cleanEnglish}, extreme emotional tension, dynamic angle, ${baseVisual}`;
+    s3VisualPrompt = `Cinematic aftermath resolution shot: ${cleanEnglish}, dramatic lighting, masterpiece composition, ${baseVisual}`;
   } else {
     // Direct subject decomposition
     s1Narration = `Di bawah naungan semesta ${theme}, hadirlah ${clean}. Suatu pemandangan yang memikat perhatian sejak detik pertama.`;
