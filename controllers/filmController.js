@@ -529,7 +529,7 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
   // Build scene metadata with audio, AI scene artwork backdrop, and true AI video URLs
   const sceneMetadata = scenes.map((scene, idx) => {
     const promptForImage = `${scene.visual_prompt || 'cinematic scene'}, ${visualStyle || 'cinematic'}, 8k resolution, cinematic lighting, masterpiece scene artwork`;
-    const aiImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptForImage)}?width=1280&height=720&nologo=true&seed=${idx + 1}_${Date.now().toString(36)}`;
+    const aiImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptForImage)}?width=1280&height=720&model=flux&nologo=true&seed=${idx + 1}_${Date.now().toString(36)}`;
     const realVideoUrl = videoResults[idx]?.video_url || null;
 
     return {
@@ -542,7 +542,7 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
       image_url: aiImageUrl,
       backdrop_url: aiImageUrl,
       video_url: realVideoUrl,
-      render_engine: realVideoUrl ? (realVideoUrl.includes('google') || realVideoUrl.includes('veo') ? 'Google Veo AI Engine' : 'Replicate AI Engine') : 'Gemini AI Art Engine',
+      render_engine: realVideoUrl ? (realVideoUrl.includes('google') || realVideoUrl.includes('veo') ? 'Google Veo AI Engine' : 'Replicate AI Engine') : 'FLUX.1 Photorealistic AI Engine',
       tts_status: ttsFailed ? 'fallback' : 'generated',
     };
   });
@@ -581,7 +581,7 @@ async function executeJob(jobId, options, req) {
       visualStyle: options.visualStyle,
       filmTheme: options.filmTheme,
       duration: options.duration || 30,
-      renderEngine: videoGenerationFailed ? 'Gemini AI Art Engine' : 'Replicate AI Engine',
+      renderEngine: videoGenerationFailed ? 'FLUX.1 Photorealistic AI Engine' : 'Google Veo AI Engine',
       logline: options.logline || '',
       createdAt: new Date().toISOString(),
       hasWatermark: !options.isPremium,
@@ -610,7 +610,7 @@ async function executeJob(jobId, options, req) {
         visualStyle: options.visualStyle,
         filmTheme: options.filmTheme,
         duration: options.duration || 30,
-        renderEngine: 'Gemini AI Art Engine',
+        renderEngine: 'FLUX.1 Photorealistic AI Engine',
         logline: options.logline || '',
         createdAt: new Date().toISOString(),
         hasWatermark: !options.isPremium,
