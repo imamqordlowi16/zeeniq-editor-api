@@ -417,13 +417,13 @@ function updateJobProgress(jobId, updates) {
 }
 
 // ─── Enhanced Step 3 with Video Generation ────────────────────────────────────
-async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId) {
-  // Generate TTS audio for each scene
+async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId, req = null) {
+  // Step 3a: Generate TTS Audio
   let audioResults = [];
   let ttsFailed = false;
   
   updateJobProgress(jobId, { 
-    status: 'processing',
+    status: 'processing', 
     progress: 60, 
     stage: 'generating_voiceover', 
     message: 'Generating voiceover with AI...' 
@@ -437,19 +437,25 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
     ttsFailed = true;
   }
   
-  // Try to generate videos using Replicate API
+  // Try to generate videos using Google Veo AI Flow & Replicate API
   let videoResults = [];
   let videoGenerationFailed = false;
+  const geminiApiKey = req?.headers?.['x-gemini-key'] || process.env.GEMINI_API_KEY;
   
   updateJobProgress(jobId, { 
-    status: 'processing',
+    status: 'processing', 
     progress: 75, 
     stage: 'rendering_ai_visuals', 
     message: 'Rendering AI scene artwork & visuals...' 
   });
   
   try {
-    videoResults = await generateFilmVideos(scenes, visualStyle, (progress) => updateJobProgress(jobId, { status: 'processing', progress, stage: 'rendering_ai_visuals', message: 'Rendering AI visuals...' }));
+    videoResults = await generateFilmVideos(
+      scenes, 
+      visualStyle, 
+      (progress) => updateJobProgress(jobId, { status: 'processing', progress, stage: 'rendering_ai_visuals', message: 'Rendering AI visuals...' }),
+      geminiApiKey
+    );
     console.log(`[Step3] Generated ${videoResults.length} videos`);
   } catch (error) {
     console.error('[Step3] Video generation failed:', error.message);
@@ -473,13 +479,14 @@ async function step3_generate_with_videos(scenes, voiceStyle, visualStyle, jobId
       image_url: aiImageUrl,
       backdrop_url: aiImageUrl,
       video_url: assignedVideoUrl,
-      render_engine: videoResults[idx]?.video_url ? 'Replicate AI Engine' : 'Gemini Video & Animation AI Engine',
+      render_engine: videoResults[idx]?.video_url ? (videoResults[idx].video_url.includes('google') || videoResults[idx].video_url.includes('veo') ? 'Google Veo AI Engine' : 'Replicate AI Engine') : 'Google Flow & Gemini Video AI Engine',
       tts_status: ttsFailed ? 'fallback' : 'generated',
     };
   });
   
   return { audioUrl: '__LOCAL_AUDIO__', sceneMetadata, videoGenerationFailed, ttsFailed };
 }
+
 async function executeJob(jobId, options, req) {
   try {
     // Step 1: Generate Script (OpenAI / Gemini)
@@ -495,7 +502,7 @@ async function executeJob(jobId, options, req) {
     // Step 3: Synthesize Audio & AI Scene Visuals
     updateJobProgress(jobId, { status: 'processing', progress: 70, stage: 'rendering_video_ai', message: 'Synthesizing voiceover & scene visuals...' });
 
-    const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(enhancedScenes, options.voiceStyle, options.visualStyle, jobId);
+    const { audioUrl, sceneMetadata, videoGenerationFailed, ttsFailed } = await step3_generate_with_videos(enhancedScenes, options.voiceStyle, options.visualStyle, jobId, req);
 
     // Step 4: Assemble Final Film
     updateJobProgress(jobId, { status: 'processing', progress: 95, stage: 'assembling_film', message: 'Assembling final film...' });

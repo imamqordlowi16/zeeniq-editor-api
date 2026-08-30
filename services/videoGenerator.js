@@ -10,6 +10,65 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 let replicate = null;
 
+/**
+ * Generate video using Google Veo AI (Google's official video model: veo-3.1-fast-generate-preview)
+ */
+async function generateGoogleVeoVideo(prompt, apiKey) {
+  const key = apiKey || process.env.GEMINI_API_KEY;
+  if (!key) return null;
+
+  const veoModels = [
+    'veo-3.1-fast-generate-preview',
+    'veo-3.1-lite-generate-preview',
+    'veo-3.1-generate-preview'
+  ];
+
+  for (const model of veoModels) {
+    try {
+      console.log(`[GoogleVeo] Attempting video generation with ${model}...`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning?key=${key}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt: prompt }]
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[GoogleVeo] ${model} returned ${res.status}:`, errText.substring(0, 120));
+        continue;
+      }
+
+      const data = await res.json();
+      if (data.name) {
+        console.log('[GoogleVeo] Long running operation created:', data.name);
+        const opUrl = `https://generativelanguage.googleapis.com/v1beta/${data.name}?key=${key}`;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await new Promise(r => setTimeout(r, 2500));
+          const opRes = await fetch(opUrl);
+          if (opRes.ok) {
+            const opData = await opRes.json();
+            if (opData.done) {
+              const videoUri = opData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+                || opData.response?.generatedVideos?.[0]?.videoUri
+                || opData.response?.videos?.[0]?.uri;
+              if (videoUri) {
+                console.log('[GoogleVeo] Video generated successfully:', videoUri);
+                return videoUri;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[GoogleVeo] Error with ${model}:`, e.message);
+    }
+  }
+  return null;
+}
+
 function getReplicateClient() {
   if (!replicate) {
     const apiKey = process.env.REPLICATE_API_TOKEN;
@@ -31,9 +90,16 @@ function getReplicateClient() {
 }
 
 /**
- * Generate video using Replicate API
+ * Generate video using Google Veo with fallback to Replicate API
  */
-async function generateVideo(prompt, style = 'realistic') {
+async function generateVideo(prompt, style = 'realistic', geminiApiKey = null) {
+  // 1. Try Google Veo Video Generation Flow first
+  const googleVideo = await generateGoogleVeoVideo(prompt, geminiApiKey);
+  if (googleVideo) {
+    return googleVideo;
+  }
+
+  // 2. Fallback to Replicate API if configured
   const client = getReplicateClient();
   if (!client) {
     console.warn('[VideoGenerator] No client available, returning null fallback');
@@ -132,16 +198,16 @@ async function generateVideo(prompt, style = 'realistic') {
 }
 
 /**
- * Generate videos for multiple scenes in parallel
+ * Generate videos for multiple scenes in parallel using Google Veo Flow with Replicate fallback
  */
-async function generateFilmVideos(scenes, visualStyle, onProgress) {
+async function generateFilmVideos(scenes, visualStyle, onProgress, geminiApiKey = null) {
   if (typeof onProgress === 'function') {
     onProgress(75);
   }
 
   const results = await Promise.all(scenes.map(async (scene, i) => {
     try {
-      const videoUrl = await generateVideo(scene.visual_prompt, visualStyle);
+      const videoUrl = await generateVideo(scene.visual_prompt, visualStyle, geminiApiKey);
       return { video_url: videoUrl, duration: scene.duration_seconds };
     } catch (error) {
       console.warn(`[VideoGenerator] Scene ${i + 1} error:`, error.message);
