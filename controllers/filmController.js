@@ -335,9 +335,19 @@ function generateDynamicAffiliateScript(options) {
 async function step1_generate_script(options, req) {
   let imageContext = '';
   if (options.characterImageBase64) {
-    imageContext = `
-- Character Reference: Character should maintain consistent facial features, clothing, and body type across all scenes.
+    try {
+      const visualDesc = await analyzeImage(
+        options.characterImageBase64,
+        'Describe the character/subject in this image in extreme detail (gender, hair, face, clothing, colors, distinctive features) so an AI image generator can reproduce the exact same character.'
+      );
+      if (visualDesc) {
+        imageContext = `
+- UPLOADED IMAGE REFERENCE: The main character/subject MUST strictly match this appearance: "${visualDesc}". Every visual_prompt must feature this exact character.
 `;
+      }
+    } catch (err) {
+      console.warn('[Step 1] Image analysis skipped:', err.message);
+    }
   }
 
   const targetDuration = Math.min(Math.max(parseInt(options.duration, 10) || 30, 15), 60);
@@ -352,11 +362,18 @@ async function step1_generate_script(options, req) {
 - Logline: ${options.logline || ''}
 ${imageContext}
 
-CRITICAL RULES:
-1. "narration": Spoken narration in natural, dramatic Indonesian specifically narrating this exact story across 3 progressive scenes (Scene 1: setup/opening, Scene 2: the turning point/climax and surprise event causing tension, Scene 3: the climax resolution / final action).
-2. "visual_prompt": Highly detailed ENGLISH prompt describing the visual scene for AI image generator (MUST accurately portray the specific characters, subjects, actions, environment, ${options.visualStyle} aesthetic, Unreal Engine 5 render, cinematic lighting, 8k resolution).
-3. "art_direction": Cinematic camera motion, lighting style, color palette.
-4. "duration_seconds": ~10 seconds per scene.
+CRITICAL RULES (100% PROMPT FIDELITY):
+1. TEMPAT & SUASANA (Location & Atmosphere):
+   - MUST 100% preserve the exact setting, environment, and place mentioned in the user prompt (e.g. ruang kelas, rumah sakit, hutan, kamar tidur, dapur, jalanan, kantor).
+   - MUST strictly convey the exact mood and atmosphere described in the prompt (e.g. panik, tegang, misterius, hening, bahagia, dramatis).
+2. ALAT & BENDA (Props & Tools):
+   - MUST explicitly feature the exact tools/props mentioned in the prompt (e.g. kertas folio bergaris, pulpen, kalkulator, papan tulis, buku, laptop, gelas, mobil, dll.) in the scene visuals and actions.
+3. VISUAL STYLE AS ART MEDIUM:
+   - Apply "${options.visualStyle}" STRICTLY as the artistic rendering medium (e.g. Realistic 35mm film photography, 3D Pixar Animation, Anime Makoto Shinkai style, Unreal Engine 5 3D render) WITHOUT modifying or overriding the location, tools, or storyline.
+4. "narration": Spoken narration in natural, dramatic Indonesian specifically narrating this exact story across 3 progressive scenes (Scene 1: setup/opening, Scene 2: the turning point/climax and surprise event causing tension with the tools/props, Scene 3: the climax resolution / final action).
+5. "visual_prompt": Highly detailed ENGLISH prompt describing the visual scene for AI image generator (MUST accurately portray the specific characters, subjects, actions, environment, props, ${options.visualStyle} aesthetic, Unreal Engine 5 render, cinematic lighting, 8k resolution).
+6. "art_direction": Cinematic camera motion, lighting style, color palette.
+7. "duration_seconds": ~10 seconds per scene.
 
 Return ONLY a JSON array with 3 objects: [{ "scene_number": 1, "narration": "...", "visual_prompt": "...", "art_direction": "...", "duration_seconds": 10 }]`;
 
